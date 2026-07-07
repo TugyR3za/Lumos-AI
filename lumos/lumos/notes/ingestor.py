@@ -4,8 +4,8 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.memory.database import Database
-from app.retrieval.chunker import chunk_text
+from lumos.memory.database import Database
+from lumos.retrieval.chunker import chunk_text
 
 SUPPORTED_SUFFIXES = {
     ".md",

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from app.memory.database import Database
+from lumos.memory.database import Database
 
 
 def test_conversation_and_note_retrieval(tmp_path: Path):

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.providers.base import Message, ProviderResponse, ToolSchema
+from lumos.providers.base import Message, ProviderResponse, ToolSchema
 
 
 class MockProvider:

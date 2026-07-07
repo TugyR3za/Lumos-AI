@@ -4,9 +4,9 @@ import asyncio
 
 from fastapi import APIRouter, HTTPException, Request
 
-from app.core.container import LumosContainer
-from app.providers.base import ProviderError
-from app.schemas import (
+from lumos.core.container import LumosContainer
+from lumos.providers.base import ProviderError
+from lumos.schemas import (
     ChatRequest,
     ChatResponse,
     ConversationResponse,

@@ -1,7 +1,7 @@
 import pytest
 
-from app.providers.base import ProviderError, ProviderResponse
-from app.providers.router import ProviderRouter
+from lumos.providers.base import ProviderError, ProviderResponse
+from lumos.providers.router import ProviderRouter
 
 
 class FakeProvider:

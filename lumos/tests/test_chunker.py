@@ -1,4 +1,4 @@
-from app.retrieval.chunker import chunk_text
+from lumos.retrieval.chunker import chunk_text
 
 
 def test_chunk_text_preserves_content_and_bounds_size():

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.web.base import WebResult, WebSearchProvider
+from lumos.web.base import WebResult, WebSearchProvider
 
 
 class WebSearchService:

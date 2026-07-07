@@ -5,14 +5,14 @@ import json
 import logging
 from typing import Literal
 
-from app.agent.prompts import build_system_prompt
-from app.memory.database import Database
-from app.providers.base import ProviderResponse
-from app.providers.router import ProviderRouter
-from app.retrieval.service import RetrievalService
-from app.schemas import ChatResponse, SourceItem
-from app.tools.registry import ToolRegistry
-from app.web.service import WebSearchService
+from lumos.agent.prompts import build_system_prompt
+from lumos.memory.database import Database
+from lumos.providers.base import ProviderResponse
+from lumos.providers.router import ProviderRouter
+from lumos.retrieval.service import RetrievalService
+from lumos.schemas import ChatResponse, SourceItem
+from lumos.tools.registry import ToolRegistry
+from lumos.web.service import WebSearchService
 
 logger = logging.getLogger(__name__)
 

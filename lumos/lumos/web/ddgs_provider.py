@@ -4,7 +4,7 @@ import asyncio
 
 from ddgs import DDGS
 
-from app.web.base import WebResult
+from lumos.web.base import WebResult
 
 
 class DDGSSearchProvider:

@@ -22,35 +22,35 @@ AgentOrchestrator
 
 ## Module boundaries
 
-### `app/providers`
+### `lumos/providers`
 
 Normalizes model-specific request and response formats into `ProviderResponse` and `ToolCall`. The agent does not know whether a response came from Ollama or a cloud service.
 
-### `app/memory`
+### `lumos/memory`
 
 Owns durable SQLite data: conversations, messages, indexed documents, chunks, and future long-term memories. It deliberately uses the standard library rather than an ORM to reduce startup cost and hidden behavior.
 
-### `app/retrieval`
+### `lumos/retrieval`
 
 Owns chunking and retrieval. The current implementation is lexical FTS5/BM25. A future hybrid or embedding retriever should preserve the `search_notes(query, limit)` contract.
 
-### `app/notes`
+### `lumos/notes`
 
 Scans a configured root, rejects unsupported or oversized files, hashes content, and incrementally replaces changed documents. It never indexes outside the configured notes root.
 
-### `app/web`
+### `lumos/web`
 
 Provides a tiny `search(query, limit)` interface. DDGS and SearXNG are current adapters. Search failures are isolated from normal chat unless the model critically depends on a search tool result.
 
-### `app/tools`
+### `lumos/tools`
 
 Provides an explicit allowlist. A model can request only registered functions. New tools should have narrow schemas, bounded inputs, structured outputs, timeouts, and an approval policy for side effects.
 
-### `app/agent`
+### `lumos/agent`
 
 Coordinates history, context, provider calls, and bounded tool loops. It does not directly query databases, HTTP endpoints, or the operating system except through injected services.
 
-### `app/static`
+### `lumos/static`
 
 A zero-build vanilla HTML/CSS/JavaScript client. It can later be replaced by a desktop, mobile, React, or native client because all behavior is exposed through JSON APIs.
 

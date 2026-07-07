@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.memory.database import Database
+from lumos.memory.database import Database
 
 
 class RetrievalService:

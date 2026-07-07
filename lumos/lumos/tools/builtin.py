@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from app.memory.database import Database
-from app.retrieval.service import RetrievalService
-from app.tools.registry import RegisteredTool, ToolRegistry
-from app.web.service import WebSearchService
+from lumos.memory.database import Database
+from lumos.retrieval.service import RetrievalService
+from lumos.tools.registry import RegisteredTool, ToolRegistry
+from lumos.web.service import WebSearchService
 
 
 def build_tool_registry(

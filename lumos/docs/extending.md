@@ -2,7 +2,7 @@
 
 ## Add a provider
 
-Implement the `ChatProvider` protocol from `app/providers/base.py`:
+Implement the `ChatProvider` protocol from `lumos/providers/base.py`:
 
 ```python
 class MyProvider:
@@ -31,7 +31,7 @@ Each result should include `title`, `path`, `content`, and `score`. This allows 
 
 ## Add a tool
 
-Register a `RegisteredTool` in `app/tools/builtin.py` or a separate feature module. Keep tools narrow:
+Register a `RegisteredTool` in `lumos/tools/builtin.py` or a separate feature module. Keep tools narrow:
 
 - Validate and cap all inputs.
 - Return JSON-serializable data.

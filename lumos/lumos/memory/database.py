@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from app.core.time import utc_now_iso
+from lumos.core.time import utc_now_iso
 
 
 class Database:

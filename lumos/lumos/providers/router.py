@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Literal
 
-from app.providers.base import ChatProvider, Message, ProviderError, ProviderResponse, ToolSchema
+from lumos.providers.base import ChatProvider, Message, ProviderError, ProviderResponse, ToolSchema
 
 logger = logging.getLogger(__name__)
 

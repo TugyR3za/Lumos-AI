@@ -4,7 +4,7 @@ install:
 	python -m pip install -e ".[dev]"
 
 run:
-	python -m app
+	python -m lumos
 
 test:
 	pytest -q

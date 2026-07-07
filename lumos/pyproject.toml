@@ -27,14 +27,14 @@ dev = [
 ]
 
 [project.scripts]
-lumos = "app.__main__:main"
+lumos = "lumos.__main__:main"
 
 [tool.setuptools.packages.find]
-include = ["app*"]
+include = ["lumos*"]
 
 
 [tool.setuptools.package-data]
-"app.static" = ["*.html", "*.css", "*.js"]
+"lumos.static" = ["*.html", "*.css", "*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

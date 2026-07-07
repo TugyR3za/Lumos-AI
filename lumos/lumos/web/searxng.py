@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import httpx
 
-from app.web.base import WebResult
+from lumos.web.base import WebResult
 
 
 class SearxNGSearchProvider:

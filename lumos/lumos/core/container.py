@@ -2,19 +2,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.agent.orchestrator import AgentOrchestrator
-from app.config import Settings
-from app.memory.database import Database
-from app.notes.ingestor import NotesIngestor
-from app.providers.ollama import OllamaProvider
-from app.providers.openai_compatible import OpenAICompatibleProvider
-from app.providers.router import ProviderRouter
-from app.retrieval.service import RetrievalService
-from app.tools.builtin import build_tool_registry
-from app.tools.registry import ToolRegistry
-from app.web.ddgs_provider import DDGSSearchProvider
-from app.web.searxng import SearxNGSearchProvider
-from app.web.service import WebSearchService
+from lumos.agent.orchestrator import AgentOrchestrator
+from lumos.config import Settings
+from lumos.memory.database import Database
+from lumos.notes.ingestor import NotesIngestor
+from lumos.providers.ollama import OllamaProvider
+from lumos.providers.openai_compatible import OpenAICompatibleProvider
+from lumos.providers.router import ProviderRouter
+from lumos.retrieval.service import RetrievalService
+from lumos.tools.builtin import build_tool_registry
+from lumos.tools.registry import ToolRegistry
+from lumos.web.ddgs_provider import DDGSSearchProvider
+from lumos.web.searxng import SearxNGSearchProvider
+from lumos.web.service import WebSearchService
 
 
 @dataclass(slots=True)

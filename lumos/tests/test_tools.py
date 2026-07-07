@@ -1,6 +1,6 @@
 import pytest
 
-from app.tools.registry import RegisteredTool, ToolRegistry
+from lumos.tools.registry import RegisteredTool, ToolRegistry
 
 
 @pytest.mark.asyncio

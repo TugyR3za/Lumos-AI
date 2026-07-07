@@ -29,7 +29,7 @@ Lumos is a Python-first, private personal AI foundation. Version 0.1 focuses on 
 ## Quick start on Windows
 
 ```powershell
-cd lumos-v0.1
+cd lumos
 py -3.11 -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
@@ -46,7 +46,7 @@ ollama pull qwen3:1.7b
 Start Lumos:
 
 ```powershell
-python -m app
+python -m lumos
 ```
 
 Open `http://127.0.0.1:8000`.
@@ -54,14 +54,14 @@ Open `http://127.0.0.1:8000`.
 ## Quick start on macOS/Linux
 
 ```bash
-cd lumos-v0.1
+cd lumos
 python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -e '.[dev]'
 cp .env.example .env
 ollama pull qwen3:1.7b
-python -m app
+python -m lumos
 ```
 
 ## Cloud fallback

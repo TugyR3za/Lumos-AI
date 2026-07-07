@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from app.memory.database import Database
-from app.notes.ingestor import NotesIngestor
+from lumos.memory.database import Database
+from lumos.notes.ingestor import NotesIngestor
 
 
 def test_ingestor_indexes_changed_files(tmp_path: Path):

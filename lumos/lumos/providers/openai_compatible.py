@@ -5,7 +5,7 @@ from typing import Any
 
 import httpx
 
-from app.providers.base import Message, ProviderError, ProviderResponse, ToolCall, ToolSchema
+from lumos.providers.base import Message, ProviderError, ProviderResponse, ToolCall, ToolSchema
 
 
 class OpenAICompatibleProvider:

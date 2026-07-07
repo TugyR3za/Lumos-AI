@@ -8,10 +8,10 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import router
-from app.config import get_settings
-from app.core.container import build_container
-from app.core.logging import configure_logging
+from lumos.api.routes import router
+from lumos.config import get_settings
+from lumos.core.container import build_container
+from lumos.core.logging import configure_logging
 
 STATIC_DIR = Path(__file__).parent / "static"
 
