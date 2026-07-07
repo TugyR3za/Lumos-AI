@@ -10,17 +10,37 @@ from lumos.providers.base import Message, ProviderError, ProviderResponse, ToolC
 
 
 class OllamaProvider:
+    """Speaks the Ollama `/api/chat` protocol against a local server or Ollama Cloud.
+
+    Ollama Cloud (https://ollama.com) is wire-compatible with the local API and
+    authenticates with a Bearer key, so one adapter covers both modes.
+    """
+
     name = "ollama"
 
-    def __init__(self, base_url: str, model: str, timeout_seconds: float = 90.0) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        model: str,
+        timeout_seconds: float = 90.0,
+        api_key: str | None = None,
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout_seconds = timeout_seconds
+        self.api_key = api_key
+        self.name = "ollama-cloud" if api_key else "ollama"
+
+    @property
+    def _headers(self) -> dict[str, str]:
+        if self.api_key:
+            return {"Authorization": f"Bearer {self.api_key}"}
+        return {}
 
     async def is_available(self) -> bool:
         try:
             async with httpx.AsyncClient(timeout=3.0) as client:
-                response = await client.get(f"{self.base_url}/api/tags")
+                response = await client.get(f"{self.base_url}/api/tags", headers=self._headers)
                 return response.is_success
         except httpx.HTTPError:
             return False
@@ -40,8 +60,15 @@ class OllamaProvider:
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-                response = await client.post(f"{self.base_url}/api/chat", json=payload)
+                response = await client.post(
+                    f"{self.base_url}/api/chat", json=payload, headers=self._headers
+                )
                 response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            detail = exc.response.text[:300]
+            raise ProviderError(
+                f"Ollama request failed ({exc.response.status_code}): {detail}"
+            ) from exc
         except httpx.HTTPError as exc:
             raise ProviderError(f"Ollama request failed: {exc}") from exc
 

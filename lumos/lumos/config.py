@@ -9,6 +9,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+OLLAMA_LOCAL_BASE_URL = "http://127.0.0.1:11434"
+OLLAMA_CLOUD_BASE_URL = "https://ollama.com"
+OLLAMA_LOCAL_DEFAULT_MODEL = "qwen3:1.7b"
+OLLAMA_CLOUD_DEFAULT_MODEL = "gpt-oss:20b"
+
 
 def _anchored(path: Path) -> Path:
     """Resolve relative paths against the project root, not the process CWD."""
@@ -45,14 +50,20 @@ class Settings(BaseSettings):
     max_tool_rounds: int = 3
     request_timeout_seconds: float = 90.0
 
+    # Primary provider: Ollama. "cloud" talks to Ollama Cloud (API key, no
+    # downloads, no local RAM); "local" talks to an Ollama install on this
+    # machine. Blank base URL / model resolve to per-mode defaults below.
     ollama_enabled: bool = True
-    ollama_base_url: str = "http://127.0.0.1:11434"
-    ollama_model: str = "qwen3:1.7b"
+    ollama_mode: Literal["local", "cloud"] = "cloud"
+    ollama_base_url: str | None = None
+    ollama_api_key: SecretStr | None = None
+    ollama_model: str | None = None
 
+    # Fallback provider: any OpenAI-compatible endpoint; OpenRouter by default.
     cloud_enabled: bool = True
-    cloud_base_url: str = "https://api.openai.com/v1"
+    cloud_base_url: str = "https://openrouter.ai/api/v1"
     cloud_api_key: SecretStr | None = None
-    cloud_model: str = "gpt-4.1-mini"
+    cloud_model: str = "openai/gpt-4o-mini"
 
     echo_fallback: bool = True
 
@@ -70,6 +81,26 @@ class Settings(BaseSettings):
     @property
     def resolved_notes_path(self) -> Path:
         return _anchored(self.notes_path)
+
+    @property
+    def resolved_ollama_base_url(self) -> str:
+        if self.ollama_base_url:
+            return self.ollama_base_url
+        if self.ollama_mode == "cloud":
+            return OLLAMA_CLOUD_BASE_URL
+        return OLLAMA_LOCAL_BASE_URL
+
+    @property
+    def resolved_ollama_model(self) -> str:
+        if self.ollama_model:
+            return self.ollama_model
+        if self.ollama_mode == "cloud":
+            return OLLAMA_CLOUD_DEFAULT_MODEL
+        return OLLAMA_LOCAL_DEFAULT_MODEL
+
+    @property
+    def ollama_api_key_value(self) -> str | None:
+        return self.ollama_api_key.get_secret_value() if self.ollama_api_key else None
 
     @property
     def cloud_api_key_value(self) -> str | None:

@@ -57,11 +57,18 @@ def build_container(settings: Settings) -> LumosContainer:
 
     local_provider = None
     if settings.ollama_enabled:
-        local_provider = OllamaProvider(
-            settings.ollama_base_url,
-            settings.ollama_model,
-            settings.request_timeout_seconds,
+        ollama_key = (
+            settings.ollama_api_key_value if settings.ollama_mode == "cloud" else None
         )
+        # Cloud mode without a key means Ollama is simply not configured yet;
+        # the router then falls through to the cloud fallback, then echo.
+        if settings.ollama_mode == "local" or ollama_key:
+            local_provider = OllamaProvider(
+                settings.resolved_ollama_base_url,
+                settings.resolved_ollama_model,
+                settings.request_timeout_seconds,
+                api_key=ollama_key,
+            )
 
     cloud_provider = None
     if settings.cloud_enabled and settings.cloud_api_key_value:

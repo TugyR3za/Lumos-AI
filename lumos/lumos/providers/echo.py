@@ -31,8 +31,11 @@ class EchoProvider:
             "No AI model is reachable right now, so this is Lumos's built-in echo "
             "fallback speaking.\n\n"
             f"You said: {last_user}\n\n"
-            "To get real answers, either start Ollama and pull a small model "
-            "(for example `ollama pull qwen3:1.7b`), or set LUMOS_CLOUD_API_KEY "
-            "in your `.env`, then send your message again."
+            "To get real answers, set one of these in your `.env` and send your "
+            "message again:\n"
+            "- LUMOS_OLLAMA_API_KEY — Ollama Cloud key (default mode, no downloads)\n"
+            "- LUMOS_CLOUD_API_KEY — OpenRouter (or compatible) fallback key\n\n"
+            "Or go fully local: LUMOS_OLLAMA_MODE=local, install Ollama, and "
+            "`ollama pull qwen3:1.7b`."
         )
         return ProviderResponse(content=text, provider=self.name, model=self.model)

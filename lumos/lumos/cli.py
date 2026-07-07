@@ -35,7 +35,7 @@ Commands:
   /status             providers, web search, notes index, and database
   /reindex            rescan the notes folder for new or changed files
   /remember <text>    save a durable personal memory
-  /model <route>      provider route for this session: auto | local | cloud
+  /model <route>      auto | local (Ollama, cloud or local mode) | cloud (fallback)
   /notes on|off       include local notes context (default on)
   /web on|off         include web search context (default off)
   /reset              start a new conversation

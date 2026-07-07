@@ -14,8 +14,8 @@ AgentOrchestrator
    |-- Notes retrieval (SQLite FTS5)
    |-- Optional proactive web search
    |-- ProviderRouter
-   |      |-- OllamaProvider
-   |      |-- OpenAICompatibleProvider
+   |      |-- OllamaProvider (Ollama Cloud with API key, or a local server)
+   |      |-- OpenAICompatibleProvider (OpenRouter by default)
    |      `-- EchoProvider (last-resort fallback, auto route only)
    `-- ToolRegistry
           |-- search_notes

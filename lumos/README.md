@@ -5,8 +5,8 @@ Lumos is a Python-first, private personal AI foundation. Version 0.1 focuses on 
 - Clean local web chat UI
 - Terminal CLI chat — the lightest option for weak machines
 - Swappable provider router
-- Ollama-first local inference
-- OpenAI-compatible cloud fallback
+- Ollama-first inference: Ollama Cloud by default (zero downloads), fully-local mode by config
+- OpenRouter fallback (any OpenAI-compatible endpoint)
 - Echo fallback so a fresh install always answers, even with no model yet
 - SQLite conversation memory, plus saved personal memories injected as context
 - Notes-folder ingestion and SQLite FTS5 retrieval
@@ -16,7 +16,7 @@ Lumos is a Python-first, private personal AI foundation. Version 0.1 focuses on 
 
 ## Architecture principles
 
-1. **Local-first, cloud-capable.** Auto routing tries Ollama first and falls back to the configured cloud provider only if local inference fails.
+1. **Ollama-first, light by default.** Auto routing tries the Ollama provider first — Ollama Cloud in the default configuration (no model downloads, minimal RAM), or a local Ollama when `LUMOS_OLLAMA_MODE=local` — and falls back to OpenRouter only on failure. Fully-private operation is one config switch away.
 2. **Small interfaces.** Providers, search engines, retrieval, and tools are adapters that can be replaced independently.
 3. **Low-resource defaults.** The core uses standard `sqlite3`, character-based chunking, FTS5 retrieval, and a dependency-free frontend.
 4. **Private by default.** The server binds to `127.0.0.1`. Cloud and web features are opt-in per configuration/request.
@@ -25,8 +25,9 @@ Lumos is a Python-first, private personal AI foundation. Version 0.1 focuses on 
 ## Requirements
 
 - Python 3.11 or newer
-- Optional: Ollama for local inference
-- Optional: an OpenAI-compatible API key for cloud fallback
+- Optional: an ollama.com API key for Ollama Cloud (the default, download-free mode)
+- Optional: an Ollama install for fully-local inference (`LUMOS_OLLAMA_MODE=local`)
+- Optional: an OpenRouter (or other OpenAI-compatible) API key for fallback
 
 ## Quick start on Windows
 
@@ -39,11 +40,9 @@ pip install -e ".[dev]"
 Copy-Item .env.example .env
 ```
 
-Install Ollama, then pull a small model appropriate for your hardware:
-
-```powershell
-ollama pull qwen3:1.7b
-```
+Add your Ollama Cloud key to `.env` (`LUMOS_OLLAMA_API_KEY=...`) — no model
+downloads needed. Prefer everything on-device? See **Providers** below for
+local mode instead.
 
 Start Lumos (web UI):
 
@@ -58,8 +57,8 @@ option on a weak machine:
 python -m lumos cli
 ```
 
-Both work before any model is installed: the echo fallback answers with setup
-instructions until Ollama or a cloud key is available.
+Both work before any key or model exists: the echo fallback answers with setup
+instructions until a provider is configured.
 
 ## Quick start on macOS/Linux
 
@@ -69,8 +68,7 @@ python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -e '.[dev]'
-cp .env.example .env
-ollama pull qwen3:1.7b
+cp .env.example .env     # then add LUMOS_OLLAMA_API_KEY (or configure local mode)
 python -m lumos          # web UI
 python -m lumos cli      # or terminal chat
 ```
@@ -93,23 +91,51 @@ server, the lowest-RAM way to use Lumos. Slash commands:
 
 `python -m lumos reindex` rebuilds the notes index and exits.
 
-## Cloud fallback
+## Providers
 
-Set these values in `.env`:
+**Primary — Ollama, in cloud or local mode.** All secrets come from `.env`;
+nothing is hardcoded.
+
+Cloud mode (default): zero downloads, near-zero local RAM. Create an API key in
+your [ollama.com](https://ollama.com) account settings:
 
 ```dotenv
-LUMOS_CLOUD_API_KEY=your-key
-LUMOS_CLOUD_BASE_URL=https://api.openai.com/v1
-LUMOS_CLOUD_MODEL=gpt-4.1-mini
+LUMOS_OLLAMA_MODE=cloud
+LUMOS_OLLAMA_API_KEY=your-ollama-com-key
 ```
 
-The cloud adapter deliberately targets the common `/chat/completions` interface so it can be replaced by another compatible host. No cloud provider is created when the key is blank.
+Local mode: fully private, everything on-device. Install Ollama, then:
+
+```dotenv
+LUMOS_OLLAMA_MODE=local
+```
+
+```powershell
+ollama pull qwen3:1.7b
+```
+
+Blank `LUMOS_OLLAMA_MODEL` resolves per mode — `gpt-oss:20b` (cloud) or
+`qwen3:1.7b` (local). `LUMOS_OLLAMA_BASE_URL` overrides the endpoint for
+advanced setups (e.g. an Ollama server on your LAN).
+
+**Fallback — OpenRouter, or any OpenAI-compatible endpoint.** Used in `auto`
+routing only when the primary provider fails. No provider is created when the
+key is blank:
+
+```dotenv
+LUMOS_CLOUD_API_KEY=your-openrouter-key
+LUMOS_CLOUD_BASE_URL=https://openrouter.ai/api/v1
+LUMOS_CLOUD_MODEL=openai/gpt-4o-mini
+```
+
+The adapter targets the common `/chat/completions` interface, so pointing
+`LUMOS_CLOUD_BASE_URL` at OpenAI, Groq, or another compatible host also works.
 
 Routing modes:
 
-- `auto`: local first, cloud after a local provider error, echo fallback last
-- `local`: never use the cloud; fails loudly instead of falling back
-- `cloud`: skip the local model; fails loudly instead of falling back
+- `auto`: Ollama first, OpenRouter after an Ollama failure, echo fallback last
+- `local`: force the Ollama provider (cloud or local mode); fails loudly
+- `cloud`: force the OpenRouter fallback; fails loudly
 
 Lumos v0.1 does not judge answer quality and silently resend a successful local answer to the cloud. That would increase privacy exposure and cost. A future router can add explicit task classification and user-approved escalation.
 
