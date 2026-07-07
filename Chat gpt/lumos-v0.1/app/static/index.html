@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark light" />
+  <title>Lumos v0.1</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">L</div>
+        <div>
+          <h1>Lumos</h1>
+          <span>Personal AI · v0.1</span>
+        </div>
+      </div>
+
+      <button id="newChat" class="secondary-button">＋ New conversation</button>
+
+      <section class="panel">
+        <h2>Runtime</h2>
+        <div id="runtimeStatus" class="status-list">
+          <div><span class="dot unknown"></span> Checking services…</div>
+        </div>
+      </section>
+
+      <section class="panel controls">
+        <h2>Request settings</h2>
+        <label>
+          Provider route
+          <select id="routeSelect">
+            <option value="auto">Auto · local first</option>
+            <option value="local">Local only</option>
+            <option value="cloud">Cloud only</option>
+          </select>
+        </label>
+        <label class="toggle-row">
+          <input id="notesToggle" type="checkbox" checked />
+          <span>Use local notes</span>
+        </label>
+        <label class="toggle-row">
+          <input id="webToggle" type="checkbox" />
+          <span>Search the web</span>
+        </label>
+      </section>
+
+      <button id="reindexNotes" class="ghost-button">Reindex notes folder</button>
+      <p class="privacy-note">Local by default. Web search and cloud routing send only the current request context to their configured services.</p>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <span class="eyebrow">PRIVATE FAMILY ASSISTANT</span>
+          <h2 id="conversationTitle">New conversation</h2>
+        </div>
+        <div id="modelBadge" class="model-badge">No model used yet</div>
+      </header>
+
+      <section id="messages" class="messages" aria-live="polite">
+        <div id="emptyState" class="empty-state">
+          <div class="orb">✦</div>
+          <h2>What should Lumos help with?</h2>
+          <p>Ask about your notes, switch on web search for current information, or test the local model.</p>
+          <div class="suggestions">
+            <button data-prompt="Summarize what is in my notes folder.">Summarize my notes</button>
+            <button data-prompt="Explain the Lumos v0.1 architecture and its extension points.">Explain the architecture</button>
+            <button data-prompt="Search my notes for active project ideas.">Find project ideas</button>
+          </div>
+        </div>
+      </section>
+
+      <form id="composer" class="composer">
+        <textarea id="messageInput" rows="1" placeholder="Message Lumos…" required></textarea>
+        <button id="sendButton" type="submit" aria-label="Send message">➤</button>
+        <div class="composer-footer">
+          <span>Enter to send · Shift+Enter for a new line</span>
+          <span id="requestState"></span>
+        </div>
+      </form>
+    </main>
+  </div>
+
+  <template id="messageTemplate">
+    <article class="message">
+      <div class="avatar"></div>
+      <div class="message-body">
+        <div class="message-header"></div>
+        <div class="message-content"></div>
+        <div class="sources"></div>
+      </div>
+    </article>
+  </template>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

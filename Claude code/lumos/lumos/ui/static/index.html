@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lumos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #16130f;          /* warm near-black, the dark room */
+    --surface: #211c16;     /* lifted panels */
+    --surface-2: #2b251d;   /* user bubble */
+    --ink: #ece3d4;         /* warm off-white text */
+    --muted: #948a79;       /* secondary text */
+    --line: #352f26;        /* hairline borders */
+    --glow: #e6a94b;        /* the light — used sparingly */
+    --glow-soft: rgba(230, 169, 75, 0.16);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Inter", system-ui, sans-serif;
+    font-size: 15.5px;
+    line-height: 1.6;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header: the wordmark is the signature — a lamp glowing in the dark. */
+  header {
+    text-align: center;
+    padding: 34px 16px 18px;
+    position: relative;
+  }
+  .mark {
+    font-family: "Fraunces", serif;
+    font-weight: 500;
+    font-size: 40px;
+    letter-spacing: 0.5px;
+    position: relative;
+    display: inline-block;
+    color: var(--ink);
+  }
+  .mark::before {           /* the glow behind the word */
+    content: "";
+    position: absolute;
+    inset: -60% -40%;
+    background: radial-gradient(closest-side, var(--glow-soft), transparent 70%);
+    z-index: -1;
+    animation: breathe 6s ease-in-out infinite;
+  }
+  .mark .dot { color: var(--glow); }
+  .tag { color: var(--muted); font-size: 13px; margin-top: 6px; }
+
+  @keyframes breathe {
+    0%, 100% { opacity: 0.75; transform: scale(1); }
+    50%      { opacity: 1;    transform: scale(1.06); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mark::before { animation: none; }
+  }
+
+  /* Conversation */
+  main {
+    flex: 1;
+    overflow-y: auto;
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 8px 20px 20px;
+  }
+  .msg { margin: 16px 0; display: flex; flex-direction: column; animation: rise .35s ease; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .msg .who {
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 5px;
+  }
+  .msg.user .who { color: var(--glow); }
+  .bubble {
+    padding: 12px 15px; border-radius: 12px; white-space: pre-wrap;
+    border: 1px solid var(--line);
+  }
+  .msg.assistant .bubble { background: var(--surface); border-top-left-radius: 4px; }
+  .msg.user .bubble { background: var(--surface-2); align-self: flex-start; border-top-left-radius: 4px; }
+  .empty { color: var(--muted); text-align: center; margin-top: 12vh; font-size: 14px; }
+
+  /* Composer */
+  footer {
+    width: 100%; max-width: 720px; margin: 0 auto; padding: 12px 20px 26px;
+  }
+  .composer {
+    display: flex; gap: 10px; align-items: flex-end;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 14px; padding: 8px 8px 8px 14px;
+  }
+  textarea {
+    flex: 1; resize: none; border: none; outline: none; background: transparent;
+    color: var(--ink); font-family: inherit; font-size: 15.5px; line-height: 1.5;
+    max-height: 160px; padding: 6px 0;
+  }
+  textarea::placeholder { color: var(--muted); }
+  button.send {
+    border: none; cursor: pointer; border-radius: 10px; padding: 9px 16px;
+    font-family: inherit; font-weight: 500; font-size: 14px;
+    color: #201a10; background: var(--glow);
+    box-shadow: 0 0 0 0 var(--glow-soft); transition: box-shadow .25s, opacity .2s;
+  }
+  button.send:hover { box-shadow: 0 0 22px 2px var(--glow-soft); }
+  button.send:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
+  .foot-note { color: var(--muted); font-size: 12px; text-align: center; margin-top: 10px; }
+  .foot-note a { color: var(--muted); }
+  .dots span { animation: blink 1.2s infinite; }
+  .dots span:nth-child(2) { animation-delay: .2s; }
+  .dots span:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%, 60%, 100% { opacity: .25; } 30% { opacity: 1; } }
+</style>
+</head>
+<body>
+  <header>
+    <div class="mark">Lumos<span class="dot">.</span></div>
+    <div class="tag" id="tag">a private assistant · loading…</div>
+  </header>
+
+  <main id="log">
+    <div class="empty" id="empty">Ask anything. Your notes and the web are within reach.</div>
+  </main>
+
+  <footer>
+    <div class="composer">
+      <textarea id="input" rows="1" placeholder="Message Lumos…"></textarea>
+      <button class="send" id="send">Send</button>
+    </div>
+    <div class="foot-note" id="foot">Lumos v0.1 · answers may be imperfect — check anything important.</div>
+  </footer>
+
+<script>
+  const log = document.getElementById("log");
+  const empty = document.getElementById("empty");
+  const input = document.getElementById("input");
+  const send = document.getElementById("send");
+  const tag = document.getElementById("tag");
+  const session = "web-" + Math.random().toString(36).slice(2, 8);
+
+  // Auto-grow the textarea.
+  input.addEventListener("input", () => {
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 160) + "px";
+  });
+
+  function addMessage(role, text) {
+    if (empty) empty.remove();
+    const wrap = document.createElement("div");
+    wrap.className = "msg " + role;
+    const who = document.createElement("div");
+    who.className = "who";
+    who.textContent = role === "user" ? "You" : "Lumos";
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = text;
+    wrap.append(who, bubble);
+    log.append(wrap);
+    log.scrollTop = log.scrollHeight;
+    return bubble;
+  }
+
+  async function sendMessage() {
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    input.style.height = "auto";
+    addMessage("user", text);
+    send.disabled = true;
+
+    const bubble = addMessage("assistant", "");
+    bubble.innerHTML = '<span class="dots"><span>·</span><span>·</span><span>·</span></span>';
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, session }),
+      });
+      const data = await res.json();
+      bubble.textContent = data.reply || "(no reply)";
+    } catch (e) {
+      bubble.textContent = "Couldn't reach the server. Is Lumos still running?";
+    } finally {
+      send.disabled = false;
+      log.scrollTop = log.scrollHeight;
+      input.focus();
+    }
+  }
+
+  send.addEventListener("click", sendMessage);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+
+  // Show which brain is answering.
+  fetch("/api/status").then(r => r.json()).then(s => {
+    const active = Object.entries(s.providers).find(([, v]) => v.startsWith("available"));
+    const name = active ? active[0] : "echo";
+    tag.textContent = `a private assistant · ${name} · ${s.notes_chunks} note chunks`;
+  }).catch(() => { tag.textContent = "a private assistant"; });
+</script>
+</body>
+</html>

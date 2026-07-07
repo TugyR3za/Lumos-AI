@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local data (keep the notes folder, ignore generated stores)
+data/lumos.db
+data/vectors.npz
+data/vectors.npz.npy
+data/notes_manifest.json

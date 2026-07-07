@@ -1,0 +1,34 @@
+# Lumos configuration (non-secret). Secrets live in .env.
+# Everything here has a sensible default in code; this file just makes the
+# knobs visible and easy to change.
+
+router:
+  # "local"  -> prefer the on-device model, fall back to cloud, then echo
+  # "cloud"  -> prefer cloud, fall back to local, then echo
+  # a name   -> force "ollama" / "groq" / "echo"
+  prefer: local
+
+providers:
+  ollama:
+    host: http://localhost:11434
+    # Small + capable for 8GB RAM / 4GB VRAM. Try qwen2.5:1.5b if this is slow.
+    model: qwen2.5:3b
+  groq:
+    # Any open model Groq serves. Needs GROQ_API_KEY in .env.
+    model: llama-3.3-70b-versatile
+
+rag:
+  embed_model: nomic-embed-text   # pulled via Ollama; hashing fallback if absent
+  hash_dim: 512                   # size of the no-model fallback vectors
+
+assistant:
+  max_tool_rounds: 4              # how many tool round-trips before a plain answer
+  history_limit: 12               # how many past turns to include as context
+  # system_prompt: |              # uncomment to override the built-in personality
+  #   You are Lumos...
+
+paths:
+  data_dir: data
+  notes_dir: data/notes
+  db_path: data/lumos.db
+  vector_path: data/vectors.npz

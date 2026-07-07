@@ -1,0 +1,15 @@
+# Core — needed for the CLI and everything except the web UI.
+requests>=2.31
+numpy>=1.24
+pyyaml>=6.0
+python-dotenv>=1.0
+rich>=13.7
+
+# Web UI — only needed for `python run.py web`.
+fastapi>=0.110
+uvicorn>=0.29
+pydantic>=2.6
+
+# Deliberately NOT included: torch / transformers / sentence-transformers.
+# Embeddings run through Ollama (or the built-in hashing fallback) to keep the
+# install small and friendly to 8GB-RAM machines.
