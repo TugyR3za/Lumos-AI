@@ -98,27 +98,29 @@ class AgentOrchestrator:
         tool_events: list[dict[str, object]] = []
         response: ProviderResponse | None = None
 
-        for _ in range(self.max_tool_rounds + 1):
-            response = await self.providers.chat(
+        for _ in range(self.max_tool_rounds):
+            candidate = await self.providers.chat(
                 messages=messages,
                 tools=self.tools.schemas(),
                 route=route,
             )
-            if not response.tool_calls:
+            if not candidate.tool_calls:
+                response = candidate
                 break
 
             messages.append(
                 {
                     "role": "assistant",
-                    "content": response.content,
+                    "content": candidate.content,
                     "tool_calls": [
                         {"id": call.id, "name": call.name, "arguments": call.arguments}
-                        for call in response.tool_calls
+                        for call in candidate.tool_calls
                     ],
                 }
             )
 
-            for call in response.tool_calls:
+            for call in candidate.tool_calls:
+                event: dict[str, object]
                 try:
                     result = await self.tools.execute(call.name, call.arguments)
                     event = {
@@ -144,11 +146,10 @@ class AgentOrchestrator:
                         "content": json.dumps(result, ensure_ascii=False),
                     }
                 )
-        else:
-            raise RuntimeError("Tool loop exceeded its configured limit")
-
         if response is None:
-            raise RuntimeError("Provider returned no response")
+            # Tool budget exhausted (or tools disabled): ask once more without
+            # offering tools so the user still gets a plain final answer.
+            response = await self.providers.chat(messages=messages, tools=None, route=route)
 
         answer = response.content.strip() or "I could not produce a text response."
         await asyncio.to_thread(
