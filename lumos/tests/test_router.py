@@ -1,6 +1,7 @@
 import pytest
 
 from lumos.providers.base import ProviderError, ProviderResponse
+from lumos.providers.echo import EchoProvider
 from lumos.providers.router import ProviderRouter
 
 
@@ -37,3 +38,54 @@ async def test_local_mode_does_not_fallback():
     )
     with pytest.raises(ProviderError):
         await router.chat([{"role": "user", "content": "hello"}], None, "local")
+
+
+@pytest.mark.asyncio
+async def test_auto_uses_echo_after_all_providers_fail():
+    router = ProviderRouter(
+        local=FakeProvider("local", fail=True),
+        cloud=FakeProvider("cloud", fail=True),
+        fallback=EchoProvider(),
+    )
+    response = await router.chat([{"role": "user", "content": "hello there"}], None, "auto")
+    assert response.provider == "echo"
+    assert "hello there" in response.content
+
+
+@pytest.mark.asyncio
+async def test_auto_uses_echo_when_nothing_is_configured():
+    router = ProviderRouter(local=None, cloud=None, fallback=EchoProvider())
+    response = await router.chat([{"role": "user", "content": "hi"}], None, "auto")
+    assert response.provider == "echo"
+
+
+@pytest.mark.asyncio
+async def test_auto_prefers_real_provider_over_echo():
+    router = ProviderRouter(
+        local=FakeProvider("local"),
+        cloud=None,
+        fallback=EchoProvider(),
+    )
+    response = await router.chat([{"role": "user", "content": "hello"}], None, "auto")
+    assert response.provider == "local"
+
+
+@pytest.mark.asyncio
+async def test_explicit_routes_never_reach_echo():
+    router = ProviderRouter(local=None, cloud=None, fallback=EchoProvider())
+    for route in ("local", "cloud"):
+        with pytest.raises(ProviderError):
+            await router.chat([{"role": "user", "content": "hello"}], None, route)
+
+
+@pytest.mark.asyncio
+async def test_status_reports_fallback_slot():
+    router = ProviderRouter(local=None, cloud=None, fallback=EchoProvider())
+    status = await router.status()
+    assert status["fallback"] == {
+        "configured": True,
+        "available": True,
+        "provider": "echo",
+        "model": "echo-fallback",
+    }
+    assert status["local"] == {"configured": False, "available": False}

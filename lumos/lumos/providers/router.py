@@ -15,9 +15,12 @@ class ProviderRouter:
         self,
         local: ChatProvider | None,
         cloud: ChatProvider | None,
+        fallback: ChatProvider | None = None,
     ) -> None:
         self.local = local
         self.cloud = cloud
+        # Only `auto` routing may reach the fallback; explicit routes fail loudly.
+        self.fallback = fallback
 
     async def chat(
         self,
@@ -52,13 +55,19 @@ class ProviderRouter:
             ordered.append(self.local)
         if self.cloud:
             ordered.append(self.cloud)
+        if self.fallback:
+            ordered.append(self.fallback)
         if not ordered:
             raise ProviderError("No providers are configured")
         return ordered
 
     async def status(self) -> dict[str, dict[str, object]]:
         result: dict[str, dict[str, object]] = {}
-        for label, provider in (("local", self.local), ("cloud", self.cloud)):
+        for label, provider in (
+            ("local", self.local),
+            ("cloud", self.cloud),
+            ("fallback", self.fallback),
+        ):
             if provider is None:
                 result[label] = {"configured": False, "available": False}
                 continue

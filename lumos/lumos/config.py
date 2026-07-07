@@ -53,6 +53,8 @@ class Settings(BaseSettings):
     cloud_api_key: SecretStr | None = None
     cloud_model: str = "gpt-4.1-mini"
 
+    echo_fallback: bool = True
+
     web_search_provider: Literal["auto", "ddgs", "searxng", "disabled"] = "auto"
     searxng_base_url: str | None = None
     web_search_max_results: int = 5

@@ -3,17 +3,20 @@
 ## Request path
 
 ```text
-Browser UI
-   |
-FastAPI route
+Browser UI                Terminal CLI
+   |                           |
+FastAPI route            lumos/cli.py
+   \___________________________/
    |
 AgentOrchestrator
    |-- SQLite conversation history
+   |-- Saved memories injected as context (SQLite FTS5)
    |-- Notes retrieval (SQLite FTS5)
    |-- Optional proactive web search
    |-- ProviderRouter
    |      |-- OllamaProvider
-   |      `-- OpenAICompatibleProvider
+   |      |-- OpenAICompatibleProvider
+   |      `-- EchoProvider (last-resort fallback, auto route only)
    `-- ToolRegistry
           |-- search_notes
           |-- search_web

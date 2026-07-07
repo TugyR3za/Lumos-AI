@@ -6,6 +6,7 @@ from lumos.agent.orchestrator import AgentOrchestrator
 from lumos.config import Settings
 from lumos.memory.database import Database
 from lumos.notes.ingestor import NotesIngestor
+from lumos.providers.echo import EchoProvider
 from lumos.providers.ollama import OllamaProvider
 from lumos.providers.openai_compatible import OpenAICompatibleProvider
 from lumos.providers.router import ProviderRouter
@@ -71,7 +72,12 @@ def build_container(settings: Settings) -> LumosContainer:
             settings.request_timeout_seconds,
         )
 
-    providers = ProviderRouter(local=local_provider, cloud=cloud_provider)
+    fallback_provider = EchoProvider() if settings.echo_fallback else None
+    providers = ProviderRouter(
+        local=local_provider,
+        cloud=cloud_provider,
+        fallback=fallback_provider,
+    )
     tools = build_tool_registry(
         retrieval=retrieval,
         web_search=web_search,
