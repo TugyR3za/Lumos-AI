@@ -54,7 +54,9 @@ class CapturingProvider:
         return ProviderResponse("ok", self.name, self.model)
 
 
-def make_agent(tmp_path: Path, provider, max_tool_rounds: int = 2) -> AgentOrchestrator:
+def make_agent(
+    tmp_path: Path, provider, max_tool_rounds: int = 2
+) -> tuple[Database, AgentOrchestrator]:
     database = Database(tmp_path / "lumos.db")
     database.initialize()
     registry = ToolRegistry()
@@ -66,7 +68,7 @@ def make_agent(tmp_path: Path, provider, max_tool_rounds: int = 2) -> AgentOrche
             handler=lambda: {"pong": True},
         )
     )
-    return AgentOrchestrator(
+    agent = AgentOrchestrator(
         database=database,
         providers=ProviderRouter(local=provider, cloud=None),
         retrieval=RetrievalService(database),
@@ -76,13 +78,15 @@ def make_agent(tmp_path: Path, provider, max_tool_rounds: int = 2) -> AgentOrche
         retrieval_top_k=3,
         web_search_max_results=3,
         max_tool_rounds=max_tool_rounds,
+        memory_top_k=4,
     )
+    return database, agent
 
 
 @pytest.mark.asyncio
 async def test_tool_exhaustion_returns_plain_answer(tmp_path: Path):
     provider = ToolHungryProvider()
-    agent = make_agent(tmp_path, provider, max_tool_rounds=2)
+    _, agent = make_agent(tmp_path, provider, max_tool_rounds=2)
 
     response = await agent.chat(
         user_message="hello",
@@ -102,7 +106,7 @@ async def test_tool_exhaustion_returns_plain_answer(tmp_path: Path):
 @pytest.mark.asyncio
 async def test_normal_turn_unaffected_by_exhaustion_handling(tmp_path: Path):
     provider = CapturingProvider()
-    agent = make_agent(tmp_path, provider)
+    _, agent = make_agent(tmp_path, provider)
 
     response = await agent.chat(
         user_message="hello",
@@ -115,3 +119,43 @@ async def test_normal_turn_unaffected_by_exhaustion_handling(tmp_path: Path):
     assert response.answer == "ok"
     assert len(provider.seen_messages) == 1  # answered on the first call
     assert response.tool_events == []
+
+
+@pytest.mark.asyncio
+async def test_relevant_memories_are_injected_into_system_prompt(tmp_path: Path):
+    provider = CapturingProvider()
+    database, agent = make_agent(tmp_path, provider)
+    database.save_memory("Family pizza night is every Friday", source="test")
+    database.save_memory("The car insurance renews in March", memory_key="insurance", source="test")
+
+    await agent.chat(
+        user_message="When is pizza night?",
+        conversation_id=None,
+        route="auto",
+        use_notes=False,
+        use_web=False,
+    )
+
+    system_message = provider.seen_messages[0][0]
+    assert system_message["role"] == "system"
+    assert "SAVED PERSONAL MEMORIES" in system_message["content"]
+    assert "Family pizza night is every Friday" in system_message["content"]
+    # The unrelated memory shares no words with the query and must not appear.
+    assert "car insurance" not in system_message["content"]
+
+
+@pytest.mark.asyncio
+async def test_no_memory_section_when_nothing_is_saved(tmp_path: Path):
+    provider = CapturingProvider()
+    _, agent = make_agent(tmp_path, provider)
+
+    await agent.chat(
+        user_message="hello there",
+        conversation_id=None,
+        route="auto",
+        use_notes=False,
+        use_web=False,
+    )
+
+    system_message = provider.seen_messages[0][0]
+    assert "SAVED PERSONAL MEMORIES" not in system_message["content"]

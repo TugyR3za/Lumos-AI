@@ -30,6 +30,7 @@ class AgentOrchestrator:
         retrieval_top_k: int,
         web_search_max_results: int,
         max_tool_rounds: int,
+        memory_top_k: int = 4,
     ) -> None:
         self.database = database
         self.providers = providers
@@ -40,6 +41,7 @@ class AgentOrchestrator:
         self.retrieval_top_k = retrieval_top_k
         self.web_search_max_results = web_search_max_results
         self.max_tool_rounds = max_tool_rounds
+        self.memory_top_k = memory_top_k
 
     async def chat(
         self,
@@ -81,13 +83,23 @@ class AgentOrchestrator:
                 logger.warning("Proactive web search failed: %s", exc)
         web_context = self._format_web_context(web_rows)
 
+        memory_rows = await asyncio.to_thread(
+            self.database.search_memories,
+            user_message,
+            limit=self.memory_top_k,
+        )
+        memory_context = self._format_memory_context(memory_rows)
+
         stored = await asyncio.to_thread(
             self.database.get_messages,
             conversation_id,
             self.history_limit,
         )
         messages: list[dict[str, object]] = [
-            {"role": "system", "content": build_system_prompt(note_context, web_context)}
+            {
+                "role": "system",
+                "content": build_system_prompt(note_context, web_context, memory_context),
+            }
         ]
         messages.extend(
             {"role": item["role"], "content": item["content"]}
@@ -191,6 +203,15 @@ class AgentOrchestrator:
             sources=sources,
             tool_events=tool_events,
         )
+
+    @staticmethod
+    def _format_memory_context(rows: list[dict[str, object]]) -> str:
+        lines = []
+        for row in rows:
+            key = row.get("memory_key")
+            prefix = f"{key}: " if key else ""
+            lines.append(f"- {prefix}{row['value']}")
+        return "\n".join(lines)
 
     @staticmethod
     def _format_web_context(rows) -> str:

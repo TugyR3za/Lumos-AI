@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     chunk_size_chars: int = 1_200
     chunk_overlap_chars: int = 160
     retrieval_top_k: int = 5
+    memory_top_k: int = 4
     conversation_history_limit: int = 16
 
     default_route: Literal["auto", "local", "cloud"] = "auto"
