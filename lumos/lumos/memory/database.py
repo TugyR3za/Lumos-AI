@@ -122,6 +122,14 @@ class Database:
             except sqlite3.OperationalError:
                 self.fts5_enabled = False
 
+    def stats(self) -> dict[str, int]:
+        """Row counts for status displays."""
+        counts: dict[str, int] = {}
+        with self.connect() as db:
+            for table in ("conversations", "messages", "documents", "chunks", "memories"):
+                counts[table] = int(db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
+        return counts
+
     def create_conversation(self, conversation_id: str | None = None) -> str:
         conversation_id = conversation_id or uuid.uuid4().hex
         now = utc_now_iso()

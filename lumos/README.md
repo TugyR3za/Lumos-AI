@@ -3,10 +3,12 @@
 Lumos is a Python-first, private personal AI foundation. Version 0.1 focuses on a small, dependable core rather than an oversized framework:
 
 - Clean local web chat UI
+- Terminal CLI chat — the lightest option for weak machines
 - Swappable provider router
 - Ollama-first local inference
 - OpenAI-compatible cloud fallback
-- SQLite conversation memory
+- Echo fallback so a fresh install always answers, even with no model yet
+- SQLite conversation memory, plus saved personal memories injected as context
 - Notes-folder ingestion and SQLite FTS5 retrieval
 - Optional web search through DDGS or SearXNG
 - Explicit, allowlisted tool-calling foundation
@@ -43,13 +45,21 @@ Install Ollama, then pull a small model appropriate for your hardware:
 ollama pull qwen3:1.7b
 ```
 
-Start Lumos:
+Start Lumos (web UI):
 
 ```powershell
 python -m lumos
 ```
 
-Open `http://127.0.0.1:8000`.
+Open `http://127.0.0.1:8000`. Or chat in the terminal instead — the lightest
+option on a weak machine:
+
+```powershell
+python -m lumos cli
+```
+
+Both work before any model is installed: the echo fallback answers with setup
+instructions until Ollama or a cloud key is available.
 
 ## Quick start on macOS/Linux
 
@@ -61,8 +71,27 @@ python -m pip install --upgrade pip
 pip install -e '.[dev]'
 cp .env.example .env
 ollama pull qwen3:1.7b
-python -m lumos
+python -m lumos          # web UI
+python -m lumos cli      # or terminal chat
 ```
+
+## Terminal CLI
+
+`python -m lumos cli` starts a chat in your terminal — no browser, no web
+server, the lowest-RAM way to use Lumos. Slash commands:
+
+| Command | Effect |
+| --- | --- |
+| `/help` | show all commands |
+| `/status` | providers, web search, notes index, and database |
+| `/reindex` | rescan the notes folder |
+| `/remember <text>` | save a durable personal memory |
+| `/model auto\|local\|cloud` | provider route for this session |
+| `/notes on\|off`, `/web on\|off` | toggle notes / web context |
+| `/reset` | start a new conversation |
+| `/quit` | exit |
+
+`python -m lumos reindex` rebuilds the notes index and exits.
 
 ## Cloud fallback
 
@@ -78,9 +107,9 @@ The cloud adapter deliberately targets the common `/chat/completions` interface 
 
 Routing modes:
 
-- `auto`: local first, cloud only after a local provider error
-- `local`: never use the cloud
-- `cloud`: skip the local model
+- `auto`: local first, cloud after a local provider error, echo fallback last
+- `local`: never use the cloud; fails loudly instead of falling back
+- `cloud`: skip the local model; fails loudly instead of falling back
 
 Lumos v0.1 does not judge answer quality and silently resend a successful local answer to the cloud. That would increase privacy exposure and cost. A future router can add explicit task classification and user-approved escalation.
 
@@ -120,7 +149,7 @@ Current tools:
 - `search_web`
 - Optional `save_memory` when `LUMOS_ALLOW_MODEL_MEMORY_WRITES=true`
 
-Durable model-written memory is disabled by default until Lumos has an approval and review interface. Conversation history is always stored locally in SQLite.
+Durable model-written memory is disabled by default until Lumos has an approval and review interface. Memories you save yourself (CLI `/remember`) are searched with FTS5 and injected into the model's context on every turn. Conversation history is always stored locally in SQLite.
 
 ## API endpoints
 
