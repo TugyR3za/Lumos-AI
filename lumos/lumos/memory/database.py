@@ -104,7 +104,7 @@ class Database:
                         content,
                         chunk_id UNINDEXED,
                         document_id UNINDEXED,
-                        tokenize='unicode61 porter'
+                        tokenize='porter unicode61'
                     )
                     """
                 )
@@ -114,7 +114,7 @@ class Database:
                         value,
                         memory_id UNINDEXED,
                         namespace UNINDEXED,
-                        tokenize='unicode61 porter'
+                        tokenize='porter unicode61'
                     )
                     """
                 )
