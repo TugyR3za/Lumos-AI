@@ -7,12 +7,20 @@ from typing import Literal
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _anchored(path: Path) -> Path:
+    """Resolve relative paths against the project root, not the process CWD."""
+    path = path.expanduser()
+    return path.resolve() if path.is_absolute() else (PROJECT_ROOT / path).resolve()
+
 
 class Settings(BaseSettings):
     """Runtime configuration loaded from environment variables and `.env`."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=PROJECT_ROOT / ".env",
         env_prefix="LUMOS_",
         case_sensitive=False,
         extra="ignore",
@@ -54,11 +62,11 @@ class Settings(BaseSettings):
 
     @property
     def resolved_database_path(self) -> Path:
-        return self.database_path.expanduser().resolve()
+        return _anchored(self.database_path)
 
     @property
     def resolved_notes_path(self) -> Path:
-        return self.notes_path.expanduser().resolve()
+        return _anchored(self.notes_path)
 
     @property
     def cloud_api_key_value(self) -> str | None:
