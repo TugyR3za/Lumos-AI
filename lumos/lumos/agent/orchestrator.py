@@ -6,6 +6,7 @@ import logging
 from typing import Literal
 
 from lumos.agent.prompts import build_system_prompt
+from lumos.graph.service import GraphService
 from lumos.memory.database import Database
 from lumos.providers.base import ProviderResponse
 from lumos.providers.echo import EchoProvider
@@ -32,12 +33,16 @@ class AgentOrchestrator:
         web_search_max_results: int,
         max_tool_rounds: int,
         memory_top_k: int = 4,
+        graph: GraphService | None = None,
     ) -> None:
         self.database = database
         self.providers = providers
         self.retrieval = retrieval
         self.web_search = web_search
         self.tools = tools
+        # Held, not read: the moment context assembly consults the graph the
+        # prompt changes, and that is its own slice.
+        self.graph = graph
         self.history_limit = history_limit
         self.retrieval_top_k = retrieval_top_k
         self.web_search_max_results = web_search_max_results

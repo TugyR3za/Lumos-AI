@@ -12,7 +12,7 @@ import logging
 from dataclasses import dataclass
 from typing import Literal, cast
 
-from rich.console import Console
+from rich.console import Console, Group
 from rich.markdown import Markdown
 from rich.markup import escape
 from rich.panel import Panel
@@ -22,6 +22,7 @@ from rich.text import Text
 from lumos.config import get_settings
 from lumos.core.container import LumosContainer, build_container
 from lumos.core.logging import configure_logging
+from lumos.graph.service import GRAPH_DISABLED_DETAIL
 from lumos.providers.base import ProviderError
 from lumos.schemas import ChatResponse
 
@@ -33,8 +34,9 @@ QUIT = object()
 HELP = """\
 Commands:
   /help               show this help
-  /status             providers, web search, notes index, and database
+  /status             providers, web search, notes index, graph, and database
   /reindex            rescan the notes folder for new or changed files
+  /graph <note>       links, tags, and related notes for a note path or slug
   /remember <text>    save a durable personal memory
   /model <route>      auto | local (primary: Ollama) | cloud (fallback: OpenRouter)
   /notes on|off       include local notes context (default on)
@@ -61,6 +63,7 @@ async def status_summary(container: LumosContainer) -> dict[str, object]:
             "available": await container.web_search.is_available(),
         },
         "counts": await asyncio.to_thread(container.database.stats),
+        "graph": {"enabled": container.graph.enabled},
         "database": str(container.settings.resolved_database_path),
         "notes_path": str(container.settings.resolved_notes_path),
     }
@@ -95,10 +98,58 @@ def _status_table(summary: dict[str, object]) -> Table:
     table.add_row("web search", f"{web.get('provider')} · {web_state}")
     counts = cast("dict[str, int]", summary["counts"])
     table.add_row("notes index", f"{counts['documents']} documents · {counts['chunks']} chunks")
+    graph = cast("dict[str, bool]", summary["graph"])
+    # The graph is written at ingest whether or not reads are on, so show the
+    # counts either way — "disabled" here means nothing queries them yet.
+    graph_state = "[green]enabled[/green]" if graph["enabled"] else "[dim]disabled[/dim]"
+    table.add_row(
+        "graph",
+        f"{graph_state} · {counts['nodes']} nodes · {counts['edges']} edges",
+    )
     table.add_row("memories", str(counts["memories"]))
     table.add_row("database", str(summary["database"]))
     table.add_row("notes folder", str(summary["notes_path"]))
     return table
+
+
+_ARROWS = {"out": "→", "in": "←"}
+
+
+async def graph_view(container: LumosContainer, target: str) -> object:
+    """One hop around a note, by path (`ideas/kitchen.md`) or slug (`kitchen`)."""
+    graph = container.graph
+    if not graph.enabled:
+        return GRAPH_DISABLED_DETAIL
+
+    node = await asyncio.to_thread(graph.node, target)
+    if node is None:
+        node = await asyncio.to_thread(graph.note_for_path, target)
+    if node is None:
+        return f"No graph node for '{target}'. Pass a note path or a slug."
+
+    neighbors = await asyncio.to_thread(graph.neighbors, node.slug)
+    where = f"{node.kind} · {node.path}" if node.path else node.kind
+    table = Table(title=f"graph · {node.slug} ({where})", show_header=True, header_style="bold")
+    table.add_column("Edge")
+    table.add_column("Node")
+    table.add_column("Kind")
+    if not neighbors:
+        table.add_row("[dim]—[/dim]", "[dim]nothing links here, no tags[/dim]", "")
+    for neighbor in neighbors:
+        table.add_row(
+            f"{_ARROWS[neighbor.direction]} {neighbor.rel}",
+            escape(neighbor.node.slug),
+            neighbor.node.kind,
+        )
+
+    # Same graph, retrieval's question: seeded with this note, what else comes up?
+    related = await asyncio.to_thread(graph.related_notes, [node.path]) if node.path else []
+    if related:
+        names = ", ".join(f"{note.slug} ({note.path})" for note in related)
+        footer = f"related notes: {names}"
+    else:
+        footer = "related notes: none"
+    return Group(table, Text(footer, style="dim"))
 
 
 async def handle_command(
@@ -121,6 +172,10 @@ async def handle_command(
             f"{stats.skipped} unchanged, {stats.removed} removed, "
             f"{stats.chunks} new chunks."
         )
+    if command == "graph":
+        if not argument:
+            return "Usage: /graph <note path or slug>"
+        return await graph_view(container, argument)
     if command == "remember":
         if not argument:
             return "Usage: /remember <text to keep>"

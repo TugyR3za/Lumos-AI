@@ -203,7 +203,7 @@ def fetch_note_nodes_by_path(db: sqlite3.Connection, paths: Sequence[str]) -> li
     placeholders = ", ".join("?" * len(paths))
     return db.execute(
         f"""
-        SELECT n.id AS id, n.slug AS slug, n.title AS title, d.path AS path
+        SELECT n.id AS id, n.kind AS kind, n.slug AS slug, n.title AS title, d.path AS path
         FROM nodes n
         JOIN documents d ON d.id = n.document_id
         WHERE n.kind = 'note' AND d.path IN ({placeholders})

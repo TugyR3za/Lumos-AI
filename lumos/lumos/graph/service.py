@@ -20,15 +20,27 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Literal, cast
 
 from lumos.graph import store
 from lumos.memory.database import Database
+
+# What the API and the CLI both say when reads are off, so they cannot drift apart.
+GRAPH_DISABLED_DETAIL = (
+    "Graph reads are disabled. Set LUMOS_GRAPH_ENABLED=true to turn them on — "
+    "ingest already writes the graph, so no reindex is needed."
+)
+
+# The database CHECKs these; the casts below are that constraint, restated.
+NodeKind = Literal["note", "tag", "entity"]
+Rel = Literal["links_to", "mentions", "tagged"]
+Direction = Literal["in", "out"]
 
 
 @dataclass(frozen=True, slots=True)
 class GraphNode:
     id: int
-    kind: str
+    kind: NodeKind
     slug: str
     title: str
     path: str | None  # notes are backed by a file; tags and entities are not
@@ -37,8 +49,8 @@ class GraphNode:
 @dataclass(frozen=True, slots=True)
 class Neighbor:
     node: GraphNode
-    rel: str
-    direction: str  # 'out': this node declares it — 'in': the other node points here
+    rel: Rel
+    direction: Direction  # 'out': this node declares it — 'in': the other points here
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +85,14 @@ class GraphService:
             row = store.fetch_node_by_slug(db, slug)
         return _node(row) if row is not None else None
 
+    def note_for_path(self, path: str) -> GraphNode | None:
+        """The note node behind a document path — what note search hands back."""
+        if not self.enabled:
+            return None
+        with self.database.connect() as db:
+            rows = store.fetch_note_nodes_by_path(db, [path])
+        return _node(rows[0]) if rows else None
+
     def neighbors(self, slug: str, *, limit: int | None = None) -> list[Neighbor]:
         """Every node one edge from ``slug``. Empty when the node has no edges
         *or* does not exist — call :meth:`node` to tell those apart."""
@@ -85,7 +105,11 @@ class GraphService:
                 return []
             rows = store.fetch_neighbors(db, int(center["id"]))
         return [
-            Neighbor(node=_node(row), rel=str(row["rel"]), direction=str(row["direction"]))
+            Neighbor(
+                node=_node(row),
+                rel=cast("Rel", row["rel"]),
+                direction=cast("Direction", row["direction"]),
+            )
             for row in rows[:cap]
         ]
 
@@ -133,7 +157,7 @@ def _node(row: sqlite3.Row) -> GraphNode:
     path = row["path"]
     return GraphNode(
         id=int(row["id"]),
-        kind=str(row["kind"]),
+        kind=cast("NodeKind", row["kind"]),
         slug=str(row["slug"]),
         title=str(row["title"]),
         path=str(path) if path is not None else None,

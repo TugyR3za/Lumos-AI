@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from lumos.agent.orchestrator import AgentOrchestrator
 from lumos.config import Settings
+from lumos.graph.service import GraphService
 from lumos.memory.database import Database
 from lumos.notes.ingestor import NotesIngestor
 from lumos.providers.echo import EchoProvider
@@ -24,6 +25,7 @@ class LumosContainer:
     database: Database
     ingestor: NotesIngestor
     retrieval: RetrievalService
+    graph: GraphService
     web_search: WebSearchService
     providers: ProviderRouter
     tools: ToolRegistry
@@ -35,6 +37,12 @@ def build_container(settings: Settings) -> LumosContainer:
     database.initialize()
 
     retrieval = RetrievalService(database)
+    graph = GraphService(
+        database,
+        enabled=settings.graph_enabled,
+        max_related=settings.graph_max_related,
+        max_neighbors=settings.graph_max_neighbors,
+    )
     ingestor = NotesIngestor(
         database,
         settings.resolved_notes_path,
@@ -97,6 +105,7 @@ def build_container(settings: Settings) -> LumosContainer:
         retrieval=retrieval,
         web_search=web_search,
         tools=tools,
+        graph=graph,
         history_limit=settings.conversation_history_limit,
         retrieval_top_k=settings.retrieval_top_k,
         web_search_max_results=settings.web_search_max_results,
@@ -108,6 +117,7 @@ def build_container(settings: Settings) -> LumosContainer:
         database=database,
         ingestor=ingestor,
         retrieval=retrieval,
+        graph=graph,
         web_search=web_search,
         providers=providers,
         tools=tools,

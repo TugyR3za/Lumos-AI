@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from lumos.core.container import LumosContainer
+from lumos.graph.service import GRAPH_DISABLED_DETAIL, GraphNode
 from lumos.providers.base import ProviderError
 from lumos.schemas import (
     ChatRequest,
     ChatResponse,
     ConversationResponse,
+    GraphNeighborItem,
+    GraphNodeItem,
+    GraphRelatedItem,
+    GraphResponse,
     HealthResponse,
     MessageItem,
     ReindexResponse,
@@ -111,6 +117,72 @@ async def search_notes(payload: SearchRequest, request: Request) -> list[SourceI
         )
         for row in rows
     ]
+
+
+@router.get("/graph", response_model=GraphResponse)
+async def graph(
+    request: Request,
+    slug: str | None = None,
+    path: Annotated[list[str] | None, Query()] = None,
+) -> GraphResponse:
+    """One hop around the note graph.
+
+    A *centre* — `slug`, or a lone `path` — comes back as `node` plus its
+    `neighbors` (links, backlinks, tags, mentions). Every `path` given, however
+    many, is a seed for `related`: the notes one link away from the seed set,
+    which is what a graph-aware retrieval would pull in.
+    """
+    container = container_from(request)
+    service = container.graph
+    if not service.enabled:
+        return GraphResponse(enabled=False, detail=GRAPH_DISABLED_DETAIL)
+
+    paths = path or []
+    if not slug and not paths:
+        raise HTTPException(status_code=400, detail="Pass slug=<node> or path=<note path>.")
+
+    centre: GraphNode | None = None
+    if slug:
+        centre = await asyncio.to_thread(service.node, slug)
+    elif len(paths) == 1:
+        centre = await asyncio.to_thread(service.note_for_path, paths[0])
+
+    neighbors: list[GraphNeighborItem] = []
+    if centre is not None:
+        neighbors = [
+            GraphNeighborItem(
+                node=_graph_node_item(neighbor.node),
+                rel=neighbor.rel,
+                direction=neighbor.direction,
+            )
+            for neighbor in await asyncio.to_thread(service.neighbors, centre.slug)
+        ]
+
+    related = [
+        GraphRelatedItem(
+            slug=note.slug,
+            title=note.title,
+            path=note.path,
+            connections=note.connections,
+            via=list(note.via),
+        )
+        for note in await asyncio.to_thread(service.related_notes, paths)
+    ]
+
+    detail = None
+    if centre is None and (slug or len(paths) == 1):
+        detail = f"No graph node for {slug or paths[0]!r}."
+    return GraphResponse(
+        enabled=True,
+        detail=detail,
+        node=_graph_node_item(centre) if centre else None,
+        neighbors=neighbors,
+        related=related,
+    )
+
+
+def _graph_node_item(node: GraphNode) -> GraphNodeItem:
+    return GraphNodeItem(kind=node.kind, slug=node.slug, title=node.title, path=node.path)
 
 
 @router.post("/search/web", response_model=list[SourceItem])

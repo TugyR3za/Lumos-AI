@@ -62,3 +62,32 @@ class HealthResponse(BaseModel):
     notes_path: str
     providers: dict[str, dict[str, Any]]
     web_search: dict[str, Any]
+
+
+class GraphNodeItem(BaseModel):
+    kind: Literal["note", "tag", "entity"]
+    slug: str
+    title: str
+    path: str | None = None  # only notes are backed by a file
+
+
+class GraphNeighborItem(BaseModel):
+    node: GraphNodeItem
+    rel: Literal["links_to", "mentions", "tagged"]
+    direction: Literal["in", "out"]
+
+
+class GraphRelatedItem(BaseModel):
+    slug: str
+    title: str
+    path: str
+    connections: int
+    via: list[str]  # the seed paths this note was reached from
+
+
+class GraphResponse(BaseModel):
+    enabled: bool
+    detail: str | None = None  # why the payload is empty, when it is
+    node: GraphNodeItem | None = None
+    neighbors: list[GraphNeighborItem] = Field(default_factory=list)
+    related: list[GraphRelatedItem] = Field(default_factory=list)
