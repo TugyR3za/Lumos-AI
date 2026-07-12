@@ -3,6 +3,8 @@ from pathlib import Path
 import pytest
 
 from lumos.agent.orchestrator import AgentOrchestrator
+from lumos.graph.extract import extract_refs
+from lumos.graph.service import GraphService
 from lumos.memory.database import Database
 from lumos.providers.base import ProviderCheck, ProviderResponse, ToolCall
 from lumos.providers.echo import EchoProvider
@@ -60,6 +62,9 @@ def make_agent(
     provider,
     max_tool_rounds: int = 2,
     router: ProviderRouter | None = None,
+    *,
+    graph_enabled: bool = False,
+    expand: bool = False,
 ) -> tuple[Database, AgentOrchestrator]:
     database = Database(tmp_path / "lumos.db")
     database.initialize()
@@ -75,7 +80,11 @@ def make_agent(
     agent = AgentOrchestrator(
         database=database,
         providers=router or ProviderRouter(primary=provider, fallback=None),
-        retrieval=RetrievalService(database),
+        retrieval=RetrievalService(
+            database,
+            graph=GraphService(database, enabled=graph_enabled),
+            expand=expand,
+        ),
         web_search=WebSearchService(None),
         tools=registry,
         history_limit=8,
@@ -213,3 +222,67 @@ async def test_real_provider_answers_keep_note_sources(tmp_path: Path):
     assert response.provider == "capture"
     assert response.sources
     assert all(source.kind == "note" for source in response.sources)
+
+
+def index_linked_notes(database: Database) -> None:
+    """A note the search can hit, and a note it links to that shares none of its words."""
+    for path, title, text in (
+        ("kitchen.md", "Kitchen", "The quartz counter budget. See [[pantry]]."),
+        ("pantry.md", "Pantry", "Shelving and jars."),
+    ):
+        database.replace_document(
+            path=path,
+            title=title,
+            sha256=path,
+            mtime_ns=1,
+            chunks=[text],
+            refs=extract_refs(text),
+        )
+
+
+async def ask_about_quartz(agent: AgentOrchestrator) -> object:
+    return await agent.chat(
+        user_message="quartz",
+        conversation_id=None,
+        route="auto",
+        use_notes=True,
+        use_web=False,
+    )
+
+
+@pytest.mark.asyncio
+async def test_linked_notes_are_read_by_the_model_but_never_cited(tmp_path: Path):
+    provider = CapturingProvider()
+    database, agent = make_agent(tmp_path, provider, graph_enabled=True, expand=True)
+    index_linked_notes(database)
+
+    response = await ask_about_quartz(agent)
+
+    prompt = provider.seen_messages[0][0]["content"]
+    assert "[NOTE 1] Kitchen (kitchen.md)" in prompt
+    assert "[LINKED NOTE 1] Pantry (pantry.md)" in prompt
+    assert "Shelving and jars" in prompt  # the model really was shown the note
+    # And yet it is not a citation: the search never matched it, so it is context,
+    # not evidence. A note the model leans on it must name in the answer instead.
+    assert [source.location for source in response.sources] == ["kitchen.md"]
+
+
+@pytest.mark.asyncio
+async def test_the_graph_only_ever_adds_to_the_prompt(tmp_path: Path):
+    # One database, one question, two agents: the only difference is whether the
+    # graph may be read. Expansion is on in both, so this pins the stricter flag.
+    off_provider, on_provider = CapturingProvider(), CapturingProvider()
+    database, off_agent = make_agent(tmp_path, off_provider, graph_enabled=False, expand=True)
+    _, on_agent = make_agent(tmp_path, on_provider, graph_enabled=True, expand=True)
+    index_linked_notes(database)
+
+    await ask_about_quartz(off_agent)
+    await ask_about_quartz(on_agent)
+
+    off_prompt = off_provider.seen_messages[0][0]["content"]
+    on_prompt = on_provider.seen_messages[0][0]["content"]
+
+    assert "LINKED NOTE" not in off_prompt  # reads off: today's prompt, unchanged
+    assert "[LINKED NOTE 1] Pantry (pantry.md)" in on_prompt
+    # Byte for byte, the graph appends and rewrites nothing that was already there.
+    assert on_prompt.startswith(off_prompt)

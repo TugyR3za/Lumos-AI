@@ -54,6 +54,15 @@ class Settings(BaseSettings):
     graph_max_related: int = 5
     graph_max_neighbors: int = 50
 
+    # Graph-aware retrieval: the notes a search finds are seeds, and the notes
+    # they [[link]] to — or that link to them — follow the hits into the prompt.
+    # This is the one graph feature that changes what the model is told, so it is
+    # opt-in on top of graph_enabled and off by default. The note context can
+    # grow by at most graph_expand_max_notes * graph_expand_max_chars characters.
+    graph_expand_retrieval: bool = False
+    graph_expand_max_notes: int = 3
+    graph_expand_max_chars: int = 800
+
     default_route: Literal["auto", "local", "cloud"] = "auto"
     max_tool_rounds: int = 3
     request_timeout_seconds: float = 90.0

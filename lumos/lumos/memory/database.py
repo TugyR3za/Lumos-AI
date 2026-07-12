@@ -4,7 +4,7 @@ import json
 import re
 import sqlite3
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -292,6 +292,29 @@ class Database:
                 db.execute("DELETE FROM documents WHERE id = ?", (document_id,))
             graph_store.prune_orphans(db)
         return len(stale)
+
+    def fetch_note_leads(self, paths: Sequence[str]) -> dict[str, dict[str, Any]]:
+        """The opening chunk of each note, keyed by path.
+
+        A note reached through the graph was reached by structure, not by a term
+        match, so no chunk of it answers the question better than any other: its
+        opening is what the note is about. A note with no chunks — an empty file —
+        is simply absent from the result, having nothing to contribute.
+        """
+        if not paths:
+            return {}
+        placeholders = ", ".join("?" * len(paths))
+        with self.connect() as db:
+            rows = db.execute(
+                f"""
+                SELECT d.path AS path, d.title AS title, c.content AS content
+                FROM documents d
+                JOIN chunks c ON c.document_id = d.id AND c.chunk_index = 0
+                WHERE d.path IN ({placeholders})
+                """,
+                tuple(paths),
+            ).fetchall()
+        return {str(row["path"]): dict(row) for row in rows}
 
     def search_chunks(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
         terms = re.findall(r"[^\W_]+", query, flags=re.UNICODE)

@@ -164,7 +164,35 @@ LUMOS_GRAPH_ENABLED=true
 
 With reads on, **◈ Graph** in the web header opens an ego view: find a note, then see what it links to, what links back, its tags, and the people or places it mentions. Every node is a link, so you can walk out from one note through a tag and into another. When an answer cites more than one note, **◈ Related notes** under its sources shows the notes one link away from all of them, ranked by how many of the cited notes reach each one — the expansion BM25 cannot make, since a linked note need not repeat the query's words.
 
-The graph is read-only and answers-only for now: it changes what you can *see*, never what the model is *told*. Retrieval and prompts are untouched. `/graph <note>` gives the same one-hop view in the terminal, and `GET /api/graph` serves both.
+`/graph <note>` gives the same one-hop view in the terminal, and `GET /api/graph` serves both.
+
+### Graph-aware retrieval
+
+Everything above only changes what you can *see*. This changes what the model is *told*, so it is a second, separate switch — and it stays off until you throw it:
+
+```dotenv
+LUMOS_GRAPH_ENABLED=true
+LUMOS_GRAPH_EXPAND_RETRIEVAL=true
+```
+
+With both on, the notes BM25 finds become seeds, and the notes they `[[link]]` to — or that link to them — follow the hits into the prompt, labelled as what they are:
+
+```text
+[NOTE 1] Kitchen (kitchen.md)
+...
+[LINKED NOTE 1] Pantry (pantry.md) — linked with kitchen.md; not a search match
+...
+```
+
+This is the one thing a keyword search cannot do: reach a note that never repeats your words but is one link from a note that does. The rules are deliberately narrow:
+
+- **Only `links_to` is followed**, forwards or backwards. Notes that merely share a tag, or share an unresolved mention, sit two hops apart through a hub of unbounded degree — one popular tag would drag your whole notes folder into the context.
+- **Linked notes never displace search hits.** They are appended after them, because being linked to an answer is weaker evidence than being one.
+- **They are ranked** by how many of the seeds reach each one: a note two hits both link to beats one a single hit mentions in passing. Ties break on slug, so the same question builds the same prompt twice running.
+- **The caps are hard.** `LUMOS_GRAPH_EXPAND_MAX_NOTES` (default 3) and `LUMOS_GRAPH_EXPAND_MAX_CHARS` (default 800, the note's opening) bound the growth: at most 2,400 extra characters, no matter how densely linked your notes are.
+- **Linked notes are context, not citations.** They do not appear in an answer's sources, because the search never matched them and a citation card would present them as grounds for an answer they may need not have touched. The model is told to name any note it does rely on, so a linked note reaches you in the answer rather than beside it.
+
+With either flag off, the prompt is byte-for-byte what it was before the graph existed.
 
 ## Web search
 

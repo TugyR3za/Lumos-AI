@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from lumos.agent.orchestrator import AgentOrchestrator
@@ -17,6 +18,8 @@ from lumos.tools.registry import ToolRegistry
 from lumos.web.ddgs_provider import DDGSSearchProvider
 from lumos.web.searxng import SearxNGSearchProvider
 from lumos.web.service import WebSearchService
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -36,12 +39,24 @@ def build_container(settings: Settings) -> LumosContainer:
     database = Database(settings.resolved_database_path)
     database.initialize()
 
-    retrieval = RetrievalService(database)
     graph = GraphService(
         database,
         enabled=settings.graph_enabled,
         max_related=settings.graph_max_related,
         max_neighbors=settings.graph_max_neighbors,
+    )
+    if settings.graph_expand_retrieval and not settings.graph_enabled:
+        # A silent no-op is worse than either answer: say which flag is winning.
+        logger.warning(
+            "LUMOS_GRAPH_EXPAND_RETRIEVAL is on but LUMOS_GRAPH_ENABLED is off, "
+            "so graph reads are disabled and retrieval expansion does nothing."
+        )
+    retrieval = RetrievalService(
+        database,
+        graph=graph,
+        expand=settings.graph_expand_retrieval,
+        max_linked=settings.graph_expand_max_notes,
+        max_linked_chars=settings.graph_expand_max_chars,
     )
     ingestor = NotesIngestor(
         database,
@@ -105,7 +120,6 @@ def build_container(settings: Settings) -> LumosContainer:
         retrieval=retrieval,
         web_search=web_search,
         tools=tools,
-        graph=graph,
         history_limit=settings.conversation_history_limit,
         retrieval_top_k=settings.retrieval_top_k,
         web_search_max_results=settings.web_search_max_results,
