@@ -1,0 +1,6 @@
+# Generated knowledge graph — rebuild with `graphify update .` (AST-only, $0).
+# Hooks keep these files churning; see the graphify rules in AGENTS.md.
+graphify-out/
+
+# Claude Code machine-local settings (absolute paths, personal overrides)
+.claude/settings.local.json
