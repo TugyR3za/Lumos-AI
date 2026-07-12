@@ -1,18 +1,19 @@
 import pytest
 
-from lumos.providers.base import ProviderError, ProviderResponse
+from lumos.providers.base import ProviderCheck, ProviderError, ProviderResponse
 from lumos.providers.echo import EchoProvider
 from lumos.providers.router import ProviderRouter
 
 
 class FakeProvider:
-    def __init__(self, name: str, fail: bool = False):
+    def __init__(self, name: str, fail: bool = False, check: ProviderCheck | None = None):
         self.name = name
         self.model = f"{name}-model"
         self.fail = fail
+        self._check = check or ProviderCheck("available")
 
-    async def is_available(self) -> bool:
-        return not self.fail
+    async def check(self) -> ProviderCheck:
+        return self._check
 
     async def chat(self, messages, tools=None):
         if self.fail:
@@ -21,20 +22,20 @@ class FakeProvider:
 
 
 @pytest.mark.asyncio
-async def test_auto_falls_back_to_cloud_after_local_error():
+async def test_auto_falls_back_after_primary_error():
     router = ProviderRouter(
-        local=FakeProvider("local", fail=True),
-        cloud=FakeProvider("cloud"),
+        primary=FakeProvider("primary", fail=True),
+        fallback=FakeProvider("fallback"),
     )
     response = await router.chat([{"role": "user", "content": "hello"}], None, "auto")
-    assert response.provider == "cloud"
+    assert response.provider == "fallback"
 
 
 @pytest.mark.asyncio
-async def test_local_mode_does_not_fallback():
+async def test_local_route_does_not_fall_back():
     router = ProviderRouter(
-        local=FakeProvider("local", fail=True),
-        cloud=FakeProvider("cloud"),
+        primary=FakeProvider("primary", fail=True),
+        fallback=FakeProvider("fallback"),
     )
     with pytest.raises(ProviderError):
         await router.chat([{"role": "user", "content": "hello"}], None, "local")
@@ -43,9 +44,9 @@ async def test_local_mode_does_not_fallback():
 @pytest.mark.asyncio
 async def test_auto_uses_echo_after_all_providers_fail():
     router = ProviderRouter(
-        local=FakeProvider("local", fail=True),
-        cloud=FakeProvider("cloud", fail=True),
-        fallback=EchoProvider(),
+        primary=FakeProvider("primary", fail=True),
+        fallback=FakeProvider("fallback", fail=True),
+        echo=EchoProvider(),
     )
     response = await router.chat([{"role": "user", "content": "hello there"}], None, "auto")
     assert response.provider == "echo"
@@ -54,7 +55,7 @@ async def test_auto_uses_echo_after_all_providers_fail():
 
 @pytest.mark.asyncio
 async def test_auto_uses_echo_when_nothing_is_configured():
-    router = ProviderRouter(local=None, cloud=None, fallback=EchoProvider())
+    router = ProviderRouter(primary=None, fallback=None, echo=EchoProvider())
     response = await router.chat([{"role": "user", "content": "hi"}], None, "auto")
     assert response.provider == "echo"
 
@@ -62,30 +63,51 @@ async def test_auto_uses_echo_when_nothing_is_configured():
 @pytest.mark.asyncio
 async def test_auto_prefers_real_provider_over_echo():
     router = ProviderRouter(
-        local=FakeProvider("local"),
-        cloud=None,
-        fallback=EchoProvider(),
+        primary=FakeProvider("primary"),
+        fallback=None,
+        echo=EchoProvider(),
     )
     response = await router.chat([{"role": "user", "content": "hello"}], None, "auto")
-    assert response.provider == "local"
+    assert response.provider == "primary"
 
 
 @pytest.mark.asyncio
 async def test_explicit_routes_never_reach_echo():
-    router = ProviderRouter(local=None, cloud=None, fallback=EchoProvider())
-    for route in ("local", "cloud"):
-        with pytest.raises(ProviderError):
-            await router.chat([{"role": "user", "content": "hello"}], None, route)
+    router = ProviderRouter(primary=None, fallback=None, echo=EchoProvider())
+    with pytest.raises(ProviderError, match="primary provider"):
+        await router.chat([{"role": "user", "content": "hello"}], None, "local")
+    with pytest.raises(ProviderError, match="fallback provider"):
+        await router.chat([{"role": "user", "content": "hello"}], None, "cloud")
 
 
 @pytest.mark.asyncio
-async def test_status_reports_fallback_slot():
-    router = ProviderRouter(local=None, cloud=None, fallback=EchoProvider())
+async def test_status_uses_slot_names_and_states():
+    router = ProviderRouter(primary=None, fallback=None, echo=EchoProvider())
     status = await router.status()
-    assert status["fallback"] == {
+    assert set(status) == {"primary", "fallback", "echo"}
+    assert status["echo"] == {
         "configured": True,
+        "state": "available",
         "available": True,
+        "detail": None,
         "provider": "echo",
         "model": "echo-fallback",
     }
-    assert status["local"] == {"configured": False, "available": False}
+    assert status["primary"] == {
+        "configured": False,
+        "state": "not_configured",
+        "available": False,
+    }
+
+
+@pytest.mark.asyncio
+async def test_status_surfaces_auth_failure_with_detail():
+    failing_check = ProviderCheck("auth_failed", "HTTP 401 from /api/ps")
+    router = ProviderRouter(
+        primary=FakeProvider("primary", check=failing_check),
+        fallback=None,
+    )
+    status = await router.status()
+    assert status["primary"]["state"] == "auth_failed"
+    assert status["primary"]["available"] is False
+    assert status["primary"]["detail"] == "HTTP 401 from /api/ps"

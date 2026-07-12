@@ -48,14 +48,14 @@ def test_explicit_overrides_beat_mode_defaults(tmp_path: Path):
 def test_cloud_mode_without_key_leaves_ollama_unconfigured(tmp_path: Path):
     settings = make_settings(tmp_path, ollama_mode="cloud", ollama_api_key=None)
     container = build_container(settings)
-    assert container.providers.local is None
-    assert container.providers.fallback is not None  # echo still answers
+    assert container.providers.primary is None
+    assert container.providers.echo is not None  # echo still answers
 
 
 def test_cloud_mode_with_key_builds_authed_provider(tmp_path: Path):
     settings = make_settings(tmp_path, ollama_mode="cloud", ollama_api_key="test-key")
     container = build_container(settings)
-    provider = container.providers.local
+    provider = container.providers.primary
     assert isinstance(provider, OllamaProvider)
     assert provider.name == "ollama-cloud"
     assert provider.base_url == "https://ollama.com"
@@ -67,7 +67,7 @@ def test_local_mode_needs_no_key_and_sends_no_auth(tmp_path: Path):
     # A key present in the environment must not leak into local requests.
     settings = make_settings(tmp_path, ollama_mode="local", ollama_api_key="test-key")
     container = build_container(settings)
-    provider = container.providers.local
+    provider = container.providers.primary
     assert isinstance(provider, OllamaProvider)
     assert provider.name == "ollama"
     assert provider.base_url == "http://127.0.0.1:11434"
@@ -79,4 +79,11 @@ def test_fallback_defaults_point_at_openrouter(tmp_path: Path):
     assert settings.cloud_base_url == "https://openrouter.ai/api/v1"
     # No key -> no fallback provider is constructed.
     container = build_container(settings)
-    assert container.providers.cloud is None
+    assert container.providers.fallback is None
+
+
+def test_fallback_provider_is_named_after_its_host(tmp_path: Path):
+    settings = make_settings(tmp_path, cloud_api_key="test-key")
+    container = build_container(settings)
+    assert container.providers.fallback is not None
+    assert container.providers.fallback.name == "openrouter"

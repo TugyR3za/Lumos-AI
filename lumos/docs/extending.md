@@ -9,8 +9,8 @@ class MyProvider:
     name = "my-provider"
     model = "my-model"
 
-    async def is_available(self) -> bool:
-        ...
+    async def check(self) -> ProviderCheck:
+        ...  # report available / reachable / auth_failed / unreachable / error
 
     async def chat(self, messages, tools=None) -> ProviderResponse:
         ...

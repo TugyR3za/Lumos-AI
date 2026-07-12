@@ -46,8 +46,10 @@ async def test_remember_and_status(container: LumosContainer):
     counts = summary["counts"]
     assert counts["memories"] == 1
     providers = summary["providers"]
-    assert providers["fallback"]["available"] is True
-    assert providers["local"]["configured"] is False
+    assert providers["echo"]["available"] is True
+    assert providers["echo"]["state"] == "available"
+    assert providers["primary"]["configured"] is False
+    assert providers["primary"]["state"] == "not_configured"
 
     table = await handle_command(container, state, "status", "")
     assert isinstance(table, Table)

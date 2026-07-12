@@ -14,6 +14,7 @@ from typing import Literal, cast
 
 from rich.console import Console
 from rich.markdown import Markdown
+from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -35,7 +36,7 @@ Commands:
   /status             providers, web search, notes index, and database
   /reindex            rescan the notes folder for new or changed files
   /remember <text>    save a durable personal memory
-  /model <route>      auto | local (Ollama, cloud or local mode) | cloud (fallback)
+  /model <route>      auto | local (primary: Ollama) | cloud (fallback: OpenRouter)
   /notes on|off       include local notes context (default on)
   /web on|off         include web search context (default off)
   /reset              start a new conversation
@@ -65,6 +66,15 @@ async def status_summary(container: LumosContainer) -> dict[str, object]:
     }
 
 
+_STATE_STYLES = {
+    "available": "[green]available[/green]",
+    "reachable": "[yellow]reachable[/yellow]",
+    "auth_failed": "[red]auth failed[/red]",
+    "unreachable": "[red]unreachable[/red]",
+    "error": "[red]error[/red]",
+}
+
+
 def _status_table(summary: dict[str, object]) -> Table:
     table = Table(title="Lumos status", show_header=True, header_style="bold")
     table.add_column("Subsystem")
@@ -74,9 +84,12 @@ def _status_table(summary: dict[str, object]) -> Table:
         if not info.get("configured"):
             table.add_row(f"provider:{label}", "not configured")
             continue
-        state = "available" if info.get("available") else "offline"
-        detail = f"{info.get('provider')} · {info.get('model')} · {state}"
-        table.add_row(f"provider:{label}", detail)
+        state = str(info.get("state", ""))
+        state_text = _STATE_STYLES.get(state, state)
+        row = f"{info.get('provider')} · {info.get('model')} · {state_text}"
+        if info.get("detail"):
+            row += f" [dim]({escape(str(info['detail']))})[/dim]"
+        table.add_row(f"provider:{label}", row)
     web = cast("dict[str, object]", summary["web_search"])
     web_state = "available" if web.get("available") else "unavailable"
     table.add_row("web search", f"{web.get('provider')} · {web_state}")

@@ -4,7 +4,8 @@ import pytest
 
 from lumos.agent.orchestrator import AgentOrchestrator
 from lumos.memory.database import Database
-from lumos.providers.base import ProviderResponse, ToolCall
+from lumos.providers.base import ProviderCheck, ProviderResponse, ToolCall
+from lumos.providers.echo import EchoProvider
 from lumos.providers.router import ProviderRouter
 from lumos.retrieval.service import RetrievalService
 from lumos.tools.registry import RegisteredTool, ToolRegistry
@@ -21,8 +22,8 @@ class ToolHungryProvider:
         self.tool_rounds = 0
         self.plain_calls = 0
 
-    async def is_available(self) -> bool:
-        return True
+    async def check(self) -> ProviderCheck:
+        return ProviderCheck("available")
 
     async def chat(self, messages, tools=None):
         if tools:
@@ -46,8 +47,8 @@ class CapturingProvider:
     def __init__(self):
         self.seen_messages: list[list[dict]] = []
 
-    async def is_available(self) -> bool:
-        return True
+    async def check(self) -> ProviderCheck:
+        return ProviderCheck("available")
 
     async def chat(self, messages, tools=None):
         self.seen_messages.append([dict(m) for m in messages])
@@ -55,7 +56,10 @@ class CapturingProvider:
 
 
 def make_agent(
-    tmp_path: Path, provider, max_tool_rounds: int = 2
+    tmp_path: Path,
+    provider,
+    max_tool_rounds: int = 2,
+    router: ProviderRouter | None = None,
 ) -> tuple[Database, AgentOrchestrator]:
     database = Database(tmp_path / "lumos.db")
     database.initialize()
@@ -70,7 +74,7 @@ def make_agent(
     )
     agent = AgentOrchestrator(
         database=database,
-        providers=ProviderRouter(local=provider, cloud=None),
+        providers=router or ProviderRouter(primary=provider, fallback=None),
         retrieval=RetrievalService(database),
         web_search=WebSearchService(None),
         tools=registry,
@@ -159,3 +163,53 @@ async def test_no_memory_section_when_nothing_is_saved(tmp_path: Path):
 
     system_message = provider.seen_messages[0][0]
     assert "SAVED PERSONAL MEMORIES" not in system_message["content"]
+
+
+def index_note(database: Database, text: str) -> None:
+    database.replace_document(
+        path="notes/pizza.md",
+        title="pizza",
+        sha256="test-hash",
+        mtime_ns=1,
+        chunks=[text],
+    )
+
+
+@pytest.mark.asyncio
+async def test_echo_answers_carry_no_sources(tmp_path: Path):
+    # When every real provider is out and echo answers, the note context that
+    # was gathered must not be presented as citations under the canned reply.
+    echo_router = ProviderRouter(primary=None, fallback=None, echo=EchoProvider())
+    database, agent = make_agent(tmp_path, None, router=echo_router)
+    index_note(database, "Family pizza night is every Friday")
+
+    response = await agent.chat(
+        user_message="When is pizza night?",
+        conversation_id=None,
+        route="auto",
+        use_notes=True,
+        use_web=False,
+    )
+
+    assert response.provider == "echo"
+    assert response.sources == []
+
+
+@pytest.mark.asyncio
+async def test_real_provider_answers_keep_note_sources(tmp_path: Path):
+    # Guard for the echo case above: source suppression must apply only to echo.
+    provider = CapturingProvider()
+    database, agent = make_agent(tmp_path, provider)
+    index_note(database, "Family pizza night is every Friday")
+
+    response = await agent.chat(
+        user_message="When is pizza night?",
+        conversation_id=None,
+        route="auto",
+        use_notes=True,
+        use_web=False,
+    )
+
+    assert response.provider == "capture"
+    assert response.sources
+    assert all(source.kind == "note" for source in response.sources)

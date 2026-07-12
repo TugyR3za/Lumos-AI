@@ -8,6 +8,7 @@ from typing import Literal
 from lumos.agent.prompts import build_system_prompt
 from lumos.memory.database import Database
 from lumos.providers.base import ProviderResponse
+from lumos.providers.echo import EchoProvider
 from lumos.providers.router import ProviderRouter
 from lumos.retrieval.service import RetrievalService
 from lumos.schemas import ChatResponse, SourceItem
@@ -174,26 +175,30 @@ class AgentOrchestrator:
             {"tool_events": tool_events},
         )
 
-        sources = [
-            SourceItem(
-                kind="note",
-                title=str(row["title"]),
-                location=str(row["path"]),
-                snippet=str(row["content"])[:400],
-                score=float(row["score"]),
+        # The echo fallback never reads the gathered context, so citing notes or
+        # web results under its canned reply would misrepresent them as used.
+        sources: list[SourceItem] = []
+        if response.provider != EchoProvider.name:
+            sources = [
+                SourceItem(
+                    kind="note",
+                    title=str(row["title"]),
+                    location=str(row["path"]),
+                    snippet=str(row["content"])[:400],
+                    score=float(row["score"]),
+                )
+                for row in note_rows
+            ]
+            sources.extend(
+                SourceItem(
+                    kind="web",
+                    title=row.title,
+                    location=row.url,
+                    snippet=row.snippet[:400],
+                )
+                for row in web_rows
             )
-            for row in note_rows
-        ]
-        sources.extend(
-            SourceItem(
-                kind="web",
-                title=row.title,
-                location=row.url,
-                snippet=row.snippet[:400],
-            )
-            for row in web_rows
-        )
-        self._add_tool_sources(sources, tool_events)
+            self._add_tool_sources(sources, tool_events)
 
         return ChatResponse(
             conversation_id=conversation_id,

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from lumos.providers.base import Message, ProviderResponse, ToolSchema
+from lumos.providers.base import Message, ProviderCheck, ProviderResponse, ToolSchema
 
 
 class EchoProvider:
@@ -15,8 +15,8 @@ class EchoProvider:
     name = "echo"
     model = "echo-fallback"
 
-    async def is_available(self) -> bool:
-        return True
+    async def check(self) -> ProviderCheck:
+        return ProviderCheck("available")
 
     async def chat(
         self,

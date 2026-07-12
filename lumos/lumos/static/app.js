@@ -118,18 +118,44 @@ async function loadConversation() {
   }
 }
 
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, (ch) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+  ));
+}
+
+const DOT_BY_STATE = {
+  available: 'ok',
+  reachable: 'warn',
+  auth_failed: 'warn',
+  unreachable: 'bad',
+  error: 'bad',
+  not_configured: 'off',
+};
+const STATE_NOTES = {
+  reachable: 'key unverified',
+  auth_failed: 'auth failed',
+  unreachable: 'unreachable',
+  error: 'error',
+};
+
 async function refreshHealth() {
   try {
     const response = await fetch('/api/health');
     const data = await response.json();
     const rows = [];
     for (const [name, status] of Object.entries(data.providers)) {
-      const state = status.available ? 'ok' : (status.configured ? 'bad' : 'off');
-      const label = status.configured ? `${name}: ${status.model}` : `${name}: not configured`;
-      rows.push(`<div><span class="dot ${state}"></span>${label}</div>`);
+      const dot = DOT_BY_STATE[status.state] || (status.configured ? 'bad' : 'off');
+      let label = `${name}: not configured`;
+      if (status.configured) {
+        label = `${name}: ${status.provider} · ${status.model}`;
+        if (STATE_NOTES[status.state]) label += ` · ${STATE_NOTES[status.state]}`;
+      }
+      const title = status.detail ? ` title="${escapeHtml(status.detail)}"` : '';
+      rows.push(`<div${title}><span class="dot ${dot}"></span>${escapeHtml(label)}</div>`);
     }
     const webState = data.web_search.available ? 'ok' : 'off';
-    rows.push(`<div><span class="dot ${webState}"></span>web: ${data.web_search.provider}</div>`);
+    rows.push(`<div><span class="dot ${webState}"></span>web: ${escapeHtml(data.web_search.provider)}</div>`);
     runtimeStatus.innerHTML = rows.join('');
   } catch (_) {
     runtimeStatus.innerHTML = '<div><span class="dot bad"></span>API unavailable</div>';

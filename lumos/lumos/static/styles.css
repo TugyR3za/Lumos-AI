@@ -40,6 +40,7 @@ button { cursor: pointer; }
 .dot.ok { background: var(--accent); box-shadow: 0 0 12px rgba(216,255,114,.45); }
 .dot.off { background: #626a78; }
 .dot.bad { background: var(--danger); }
+.dot.warn { background: #f0b35e; box-shadow: 0 0 12px rgba(240,179,94,.4); }
 .controls { display: grid; gap: 13px; }
 .controls label:not(.toggle-row) { display: grid; gap: 8px; color: #c3cad5; font-size: 13px; }
 select, textarea {

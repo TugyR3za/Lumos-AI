@@ -55,35 +55,35 @@ def build_container(settings: Settings) -> LumosContainer:
             web_provider = DDGSSearchProvider()
     web_search = WebSearchService(web_provider)
 
-    local_provider = None
+    primary_provider = None
     if settings.ollama_enabled:
         ollama_key = (
             settings.ollama_api_key_value if settings.ollama_mode == "cloud" else None
         )
         # Cloud mode without a key means Ollama is simply not configured yet;
-        # the router then falls through to the cloud fallback, then echo.
+        # the router then falls through to the fallback provider, then echo.
         if settings.ollama_mode == "local" or ollama_key:
-            local_provider = OllamaProvider(
+            primary_provider = OllamaProvider(
                 settings.resolved_ollama_base_url,
                 settings.resolved_ollama_model,
                 settings.request_timeout_seconds,
                 api_key=ollama_key,
             )
 
-    cloud_provider = None
+    fallback_provider = None
     if settings.cloud_enabled and settings.cloud_api_key_value:
-        cloud_provider = OpenAICompatibleProvider(
+        fallback_provider = OpenAICompatibleProvider(
             settings.cloud_base_url,
             settings.cloud_api_key_value,
             settings.cloud_model,
             settings.request_timeout_seconds,
         )
 
-    fallback_provider = EchoProvider() if settings.echo_fallback else None
+    echo_provider = EchoProvider() if settings.echo_fallback else None
     providers = ProviderRouter(
-        local=local_provider,
-        cloud=cloud_provider,
+        primary=primary_provider,
         fallback=fallback_provider,
+        echo=echo_provider,
     )
     tools = build_tool_registry(
         retrieval=retrieval,
