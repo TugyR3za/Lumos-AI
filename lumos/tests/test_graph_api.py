@@ -1,4 +1,4 @@
-"""GET /api/graph (Graph V1, slice 4).
+"""The graph over HTTP: GET /api/graph, and what /api/health says about it.
 
 Mounts the real router on a bare app with a real container behind it, so the
 tests exercise routing, query parsing, and serialisation together.
@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from lumos.api.routes import router
 from lumos.config import Settings
 from lumos.core.container import build_container
+from lumos.graph.service import GRAPH_DISABLED_DETAIL
 
 
 def make_client(tmp_path: Path, *, graph_enabled: bool = True) -> TestClient:
@@ -111,3 +112,22 @@ def test_disabled_graph_answers_without_touching_the_database(tmp_path: Path):
     }
     # Even the missing-target 400 never fires: disabled is answered first.
     assert client.get("/api/graph").json()["enabled"] is False
+
+
+def test_health_sizes_the_graph(client: TestClient):
+    graph = client.get("/api/health").json()["graph"]
+
+    # Two notes, one tag, one entity; a.md's three edges.
+    assert graph == {"enabled": True, "nodes": 4, "edges": 3, "detail": None}
+
+
+def test_health_says_why_reads_are_off(tmp_path: Path):
+    client = make_client(tmp_path, graph_enabled=False)
+
+    graph = client.get("/api/health").json()["graph"]
+
+    # Ingest built the graph regardless, so the counts still stand — only the
+    # reads are off, and health carries the reason a client should show.
+    assert (graph["nodes"], graph["edges"]) == (4, 3)
+    assert graph["enabled"] is False
+    assert graph["detail"] == GRAPH_DISABLED_DETAIL

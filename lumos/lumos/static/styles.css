@@ -12,6 +12,7 @@
   --accent-2: #a9dc4d;
   --danger: #ff7e8b;
   --sidebar: 290px;
+  --drawer: 400px;
 }
 
 * { box-sizing: border-box; }
@@ -95,8 +96,50 @@ select:focus, textarea:focus { border-color: #59643c; box-shadow: 0 0 0 3px rgba
 .composer button:disabled { cursor: not-allowed; opacity: .45; }
 .composer-footer { grid-column: 1 / -1; display: flex; justify-content: space-between; padding: 0 7px; color: #727c8c; font-size: 10px; }
 
+/* Graph drawer: an ego view over /api/graph. Opens beside the chat rather than
+   over it, so an answer and the notes behind it can be read together. */
+.topbar-actions { display: flex; align-items: center; gap: 10px; }
+.pill-button { padding: 8px 12px; border-radius: 999px; border: 1px solid var(--border); color: #cbd2dc; background: var(--surface); font-size: 12px; }
+.pill-button:hover { border-color: #515c6d; color: #e9edf5; }
+.drawer {
+  position: fixed; top: 0; right: 0; z-index: 20; width: min(var(--drawer), 100%); height: 100vh;
+  display: flex; flex-direction: column; border-left: 1px solid var(--border);
+  background: rgba(12,15,21,.97); backdrop-filter: blur(20px); box-shadow: -26px 0 70px rgba(0,0,0,.45);
+}
+.drawer[hidden] { display: none; }
+body.graph-open .shell { padding-right: var(--drawer); }
+body.graph-open .composer { right: var(--drawer); width: min(900px, calc(100% - var(--sidebar) - var(--drawer) - 36px)); }
+.drawer-head { display: flex; align-items: center; gap: 10px; padding: 17px 16px; border-bottom: 1px solid var(--border); }
+.drawer-head > div { margin-right: auto; min-width: 0; }
+.drawer-head h2 { margin: 0; font-size: 15px; letter-spacing: -.01em; }
+.drawer-counts { color: var(--muted); font-size: 11px; }
+.icon-button { width: 32px; height: 32px; border-radius: 10px; border: 1px solid var(--border); color: #cbd2dc; background: var(--surface-2); }
+.icon-button:hover { border-color: #4a5362; background: var(--surface-3); }
+.drawer-search { padding: 15px 16px 0; }
+.drawer-search input { width: 100%; padding: 10px 12px; color: inherit; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; outline: none; }
+.drawer-search input:focus { border-color: #59643c; box-shadow: 0 0 0 3px rgba(216,255,114,.07); }
+.drawer-body { flex: 1; overflow-y: auto; padding: 16px; display: grid; gap: 17px; align-content: start; }
+.drawer-note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.graph-centre { border: 1px solid var(--border); border-radius: 13px; padding: 12px; background: var(--surface); }
+.graph-centre h3 { margin: 8px 0 3px; font-size: 15px; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.graph-centre p { margin: 0; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.kind-badge { padding: 3px 7px; border-radius: 999px; border: 1px solid #59643c; color: var(--accent); background: rgba(216,255,114,.07); font-size: 10px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.graph-group { display: grid; gap: 7px; }
+.graph-group h3 { margin: 0; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.graph-item { display: grid; gap: 2px; justify-items: start; text-align: left; padding: 9px 11px; border: 1px solid var(--border); border-radius: 11px; background: rgba(17,20,27,.8); color: #dfe6ef; }
+.graph-item:hover { border-color: #515c6d; background: var(--surface-3); }
+.graph-item strong { font-size: 12px; overflow-wrap: anywhere; }
+.graph-item span { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.graph-item .count { color: var(--accent-2); }
+.source-open { padding: 0; border: 0; background: none; color: #dfe6ef; font-size: 12px; font-weight: 700; text-align: left; }
+.source-open:hover { color: var(--accent); }
+.sources .pill-button { justify-self: start; padding: 6px 11px; font-size: 11px; }
+
 @media (max-width: 780px) {
   :root { --sidebar: 0px; }
+  .drawer { width: 100%; }
+  body.graph-open .shell { padding-right: 0; }
+  body.graph-open .composer { right: 0; width: calc(100% - 24px); }
   .shell { display: block; }
   .sidebar { position: relative; width: 100%; height: auto; border-right: 0; border-bottom: 1px solid var(--border); }
   .panel, .privacy-note { display: none; }

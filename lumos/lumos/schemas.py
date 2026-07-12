@@ -62,6 +62,7 @@ class HealthResponse(BaseModel):
     notes_path: str
     providers: dict[str, dict[str, Any]]
     web_search: dict[str, Any]
+    graph: dict[str, Any]  # enabled, node/edge counts, and why reads are off
 
 
 class GraphNodeItem(BaseModel):

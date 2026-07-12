@@ -33,6 +33,7 @@ def container_from(request: Request) -> LumosContainer:
 @router.get("/health", response_model=HealthResponse)
 async def health(request: Request) -> HealthResponse:
     container = container_from(request)
+    counts = await asyncio.to_thread(container.database.stats)
     return HealthResponse(
         status="ok",
         database=str(container.settings.resolved_database_path),
@@ -41,6 +42,15 @@ async def health(request: Request) -> HealthResponse:
         web_search={
             "provider": container.web_search.name,
             "available": await container.web_search.is_available(),
+        },
+        # Ingest writes the graph whether or not reads are on, so the counts are
+        # true either way; `enabled` says whether anything is allowed to read
+        # them, and `detail` — as for a provider — says why when it is not.
+        graph={
+            "enabled": container.graph.enabled,
+            "nodes": counts["nodes"],
+            "edges": counts["edges"],
+            "detail": None if container.graph.enabled else GRAPH_DISABLED_DETAIL,
         },
     )
 

@@ -57,7 +57,10 @@
           <span class="eyebrow">PRIVATE FAMILY ASSISTANT</span>
           <h2 id="conversationTitle">New conversation</h2>
         </div>
-        <div id="modelBadge" class="model-badge">No model used yet</div>
+        <div class="topbar-actions">
+          <button id="openGraph" class="pill-button" type="button" aria-controls="graphDrawer" aria-expanded="false">◈ Graph</button>
+          <div id="modelBadge" class="model-badge">No model used yet</div>
+        </div>
       </header>
 
       <section id="messages" class="messages" aria-live="polite">
@@ -83,6 +86,21 @@
       </form>
     </main>
   </div>
+
+  <aside id="graphDrawer" class="drawer" aria-label="Note graph" hidden>
+    <header class="drawer-head">
+      <button id="graphBack" class="icon-button" type="button" aria-label="Back" hidden>←</button>
+      <div>
+        <h2>Graph</h2>
+        <span id="graphCounts" class="drawer-counts">Reading the index…</span>
+      </div>
+      <button id="graphClose" class="icon-button" type="button" aria-label="Close graph">✕</button>
+    </header>
+    <form id="graphSearch" class="drawer-search">
+      <input id="graphQuery" type="search" placeholder="Find a note…" aria-label="Find a note" autocomplete="off" />
+    </form>
+    <div id="graphBody" class="drawer-body"></div>
+  </aside>
 
   <template id="messageTemplate">
     <article class="message">

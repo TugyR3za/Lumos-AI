@@ -81,8 +81,9 @@ server, the lowest-RAM way to use Lumos. Slash commands:
 | Command | Effect |
 | --- | --- |
 | `/help` | show all commands |
-| `/status` | providers, web search, notes index, and database |
+| `/status` | providers, web search, notes index, graph, and database |
 | `/reindex` | rescan the notes folder |
+| `/graph <note>` | links, tags, and related notes for a note path or slug |
 | `/remember <text>` | save a durable personal memory |
 | `/model auto\|local\|cloud` | provider route for this session |
 | `/notes on\|off`, `/web on\|off` | toggle notes / web context |
@@ -151,6 +152,20 @@ file -> UTF-8 text -> paragraph-aware chunks -> SQLite -> FTS5/BM25 search
 
 This is intentionally lightweight. A future embedding retriever can implement the same retrieval interface without changing the chat agent or UI.
 
+## Knowledge graph
+
+Ingest also derives a graph from your notes: a node per note, per `#tag`, and per `[[wikilink]]` target that no note backs yet, joined by `links_to`, `tagged`, and `mentions` edges. It is written on every ingest, so it is always as current as the index.
+
+Reading it is off by default:
+
+```dotenv
+LUMOS_GRAPH_ENABLED=true
+```
+
+With reads on, **◈ Graph** in the web header opens an ego view: find a note, then see what it links to, what links back, its tags, and the people or places it mentions. Every node is a link, so you can walk out from one note through a tag and into another. When an answer cites more than one note, **◈ Related notes** under its sources shows the notes one link away from all of them, ranked by how many of the cited notes reach each one — the expansion BM25 cannot make, since a linked note need not repeat the query's words.
+
+The graph is read-only and answers-only for now: it changes what you can *see*, never what the model is *told*. Retrieval and prompts are untouched. `/graph <note>` gives the same one-hop view in the terminal, and `GET /api/graph` serves both.
+
 ## Web search
 
 The default `auto` mode uses:
@@ -185,6 +200,7 @@ Durable model-written memory is disabled by default until Lumos has an approval 
 - `POST /api/notes/reindex`
 - `POST /api/search/notes`
 - `POST /api/search/web`
+- `GET /api/graph?slug=<node>` or `?path=<note>` (repeat `path` to seed related notes)
 - `GET /docs` for generated OpenAPI documentation
 
 ## Development
