@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from lumos.core.time import utc_now_iso
+from lumos.graph import store as graph_store
+from lumos.graph.extract import NoteRefs
 
 
 class Database:
@@ -97,6 +99,7 @@ class Database:
                     ON memories(namespace, updated_at DESC);
                 """
             )
+            graph_store.create_tables(db)
             try:
                 db.execute(
                     """
@@ -128,6 +131,7 @@ class Database:
         with self.connect() as db:
             for table in ("conversations", "messages", "documents", "chunks", "memories"):
                 counts[table] = int(db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
+            counts.update(graph_store.graph_counts(db))
         return counts
 
     def create_conversation(self, conversation_id: str | None = None) -> str:
@@ -208,6 +212,7 @@ class Database:
         mtime_ns: int,
         chunks: list[str],
         metadata: dict[str, Any] | None = None,
+        refs: NoteRefs | None = None,
     ) -> int:
         now = utc_now_iso()
         with self.connect() as db:
@@ -265,6 +270,11 @@ class Database:
                         "INSERT INTO chunks_fts(content, chunk_id, document_id) VALUES (?, ?, ?)",
                         (content, chunk_id, document_id),
                     )
+
+            if refs is not None:
+                graph_store.sync_note(
+                    db, document_id=document_id, path=path, title=title, refs=refs
+                )
         return len(chunks)
 
     def remove_documents_not_in(self, active_paths: set[str]) -> int:
@@ -278,7 +288,9 @@ class Database:
             for document_id, _ in stale:
                 if self.fts5_enabled:
                     db.execute("DELETE FROM chunks_fts WHERE document_id = ?", (document_id,))
+                graph_store.downgrade_note(db, document_id)
                 db.execute("DELETE FROM documents WHERE id = ?", (document_id,))
+            graph_store.prune_orphans(db)
         return len(stale)
 
     def search_chunks(self, query: str, limit: int = 5) -> list[dict[str, Any]]:

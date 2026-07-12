@@ -4,6 +4,7 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
+from lumos.graph.extract import extract_refs
 from lumos.memory.database import Database
 from lumos.retrieval.chunker import chunk_text
 
@@ -98,6 +99,9 @@ class NotesIngestor:
                 mtime_ns=file_stat.st_mtime_ns,
                 chunks=chunks,
                 metadata={"suffix": path.suffix.lower(), "size_bytes": file_stat.st_size},
+                # Only markdown speaks the [[wikilink]]/#tag vocabulary; extracting
+                # from code or config would mint garbage nodes.
+                refs=extract_refs(text) if path.suffix.lower() == ".md" else None,
             )
             stats.indexed += 1
             stats.chunks += count
