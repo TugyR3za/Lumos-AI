@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Sequence
 from pathlib import PurePosixPath
 
 from lumos.core.time import utc_now_iso
@@ -152,6 +153,93 @@ def graph_counts(db: sqlite3.Connection) -> dict[str, int]:
         "nodes": int(db.execute("SELECT COUNT(*) FROM nodes").fetchone()[0]),
         "edges": int(db.execute("SELECT COUNT(*) FROM edges").fetchone()[0]),
     }
+
+
+# --- reads (GraphService is the only caller; nothing below writes) ------------
+
+
+def fetch_node_by_slug(db: sqlite3.Connection, slug: str) -> sqlite3.Row | None:
+    return db.execute(
+        """
+        SELECT n.id AS id, n.kind AS kind, n.slug AS slug, n.title AS title, d.path AS path
+        FROM nodes n
+        LEFT JOIN documents d ON d.id = n.document_id
+        WHERE n.slug = ?
+        """,
+        (slug,),
+    ).fetchone()
+
+
+def fetch_neighbors(db: sqlite3.Connection, node_id: int) -> list[sqlite3.Row]:
+    """Every node exactly one edge away, in either direction.
+
+    Tags and entities back no file, hence the LEFT JOIN: their ``path`` is NULL.
+    """
+    return db.execute(
+        """
+        SELECT 'out' AS direction, e.rel AS rel, n.id AS id, n.kind AS kind,
+               n.slug AS slug, n.title AS title, d.path AS path
+        FROM edges e
+        JOIN nodes n ON n.id = e.dst
+        LEFT JOIN documents d ON d.id = n.document_id
+        WHERE e.src = ?
+        UNION ALL
+        SELECT 'in' AS direction, e.rel AS rel, n.id AS id, n.kind AS kind,
+               n.slug AS slug, n.title AS title, d.path AS path
+        FROM edges e
+        JOIN nodes n ON n.id = e.src
+        LEFT JOIN documents d ON d.id = n.document_id
+        WHERE e.dst = ?
+        ORDER BY direction, rel, slug
+        """,
+        (node_id, node_id),
+    ).fetchall()
+
+
+def fetch_note_nodes_by_path(db: sqlite3.Connection, paths: Sequence[str]) -> list[sqlite3.Row]:
+    """Note nodes behind the given document paths — the seeds of an expansion."""
+    if not paths:
+        return []
+    placeholders = ", ".join("?" * len(paths))
+    return db.execute(
+        f"""
+        SELECT n.id AS id, n.slug AS slug, n.title AS title, d.path AS path
+        FROM nodes n
+        JOIN documents d ON d.id = n.document_id
+        WHERE n.kind = 'note' AND d.path IN ({placeholders})
+        """,
+        tuple(paths),
+    ).fetchall()
+
+
+def fetch_linked_notes(db: sqlite3.Connection, node_ids: Sequence[int]) -> list[sqlite3.Row]:
+    """Notes one ``links_to`` hop from any seed, forwards (links) or backwards
+    (backlinks). ``seed_id`` names the seed each row was reached from.
+
+    Only ``links_to`` joins two notes directly. Notes that merely share a tag or
+    an unresolved mention sit two hops apart, through a hub node whose degree is
+    unbounded — expanding through those is a separate, guarded decision, not
+    this one.
+    """
+    if not node_ids:
+        return []
+    placeholders = ", ".join("?" * len(node_ids))
+    return db.execute(
+        f"""
+        SELECT e.src AS seed_id, n.id AS id, n.slug AS slug, n.title AS title, d.path AS path
+        FROM edges e
+        JOIN nodes n ON n.id = e.dst
+        JOIN documents d ON d.id = n.document_id
+        WHERE e.rel = 'links_to' AND n.kind = 'note' AND e.src IN ({placeholders})
+        UNION ALL
+        SELECT e.dst AS seed_id, n.id AS id, n.slug AS slug, n.title AS title, d.path AS path
+        FROM edges e
+        JOIN nodes n ON n.id = e.src
+        JOIN documents d ON d.id = n.document_id
+        WHERE e.rel = 'links_to' AND n.kind = 'note' AND e.dst IN ({placeholders})
+        """,
+        tuple(node_ids) * 2,
+    ).fetchall()
 
 
 def _claim_note_node(

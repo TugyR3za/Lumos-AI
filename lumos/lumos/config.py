@@ -46,6 +46,14 @@ class Settings(BaseSettings):
     memory_top_k: int = 4
     conversation_history_limit: int = 16
 
+    # Knowledge graph derived from notes at ingest time. Reads are off by
+    # default: with this false, GraphService answers empty and no caller can
+    # change retrieval or prompts. The graph is still written during ingest —
+    # it is cheap, and it means turning this on needs no reindex.
+    graph_enabled: bool = False
+    graph_max_related: int = 5
+    graph_max_neighbors: int = 50
+
     default_route: Literal["auto", "local", "cloud"] = "auto"
     max_tool_rounds: int = 3
     request_timeout_seconds: float = 90.0
