@@ -1,5 +1,6 @@
-# Generated knowledge graph — rebuild with `graphify update .` (AST-only, $0).
-# Hooks keep these files churning; see the graphify rules in AGENTS.md.
+# Output of the third-party graphify tool, which this project no longer uses.
+# Ignored so a stray manual run can never land in the repo; Lumos's own
+# knowledge graph is derived into SQLite (see lumos/lumos/graph/).
 graphify-out/
 
 # Claude Code machine-local settings (absolute paths, personal overrides)
