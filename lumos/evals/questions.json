@@ -1,187 +1,245 @@
 {
   "corpus": "notes",
   "about": [
-    "Each question names the one note that holds its answer (needs_note) and a canary",
-    "(answer_contains): a token the model cannot produce unless it actually read that note.",
-    "A surname, a code, a figure — never something it could paraphrase or guess.",
+    "Each question names every note needed to answer it (needs_notes) and, for each",
+    "fact it must produce, a canary: a token the model cannot say unless it really",
+    "read that note. A surname, a code, a figure — never something it could",
+    "paraphrase or guess. answer_contains is a list of facts; each fact is a list of",
+    "acceptable spellings. ALL the facts must appear, ANY spelling will do.",
     "",
-    "kind=linked : the question's words are in a note that LINKS to needs_note, not in",
-    "              needs_note itself, so BM25 alone should miss it. This is what the",
-    "              graph exists for, and the eval checks the premise rather than",
-    "              trusting it: a linked question BM25 can already answer is reported",
-    "              as a corpus fault, not counted as a win.",
-    "kind=direct : BM25 should find needs_note unaided. These are the control. Expansion",
-    "              must not lose them — a direct question that regresses is the noise",
-    "              failure mode, paid for in context it did not need."
+    "kind=linked : BM25 alone cannot supply every note the question needs, so the",
+    "              graph has to. This is what the expansion exists for, and the eval",
+    "              checks the premise rather than trusting it: a linked question BM25",
+    "              can already answer whole is a corpus fault, not a win.",
+    "kind=direct : BM25 should find everything unaided. These are the control. The",
+    "              expansion must not lose them — a direct question that regresses is",
+    "              the noise failure mode, paid for in context it did not need.",
+    "",
+    "A question needing more than one note is a MULTI-NOTE question. It is not a",
+    "third kind: it is simply len(needs_notes) > 1, and it is the hard case, because",
+    "reaching both notes is necessary and no longer sufficient — the model has to",
+    "carry a fact out of each and join them."
   ],
   "questions": [
     {
       "id": "radiators-cold-who",
       "question": "Who do we call when the radiators go cold?",
-      "needs_note": "house/boiler.md",
-      "answer_contains": ["Kavanagh"],
+      "needs_notes": ["house/boiler.md"],
+      "answer_contains": [["Kavanagh"]],
       "kind": "linked"
     },
     {
       "id": "radiators-serviced-how-often",
       "question": "How often does the radiator system get serviced?",
-      "needs_note": "house/boiler.md",
-      "answer_contains": ["14 months", "fourteen months"],
+      "needs_notes": ["house/boiler.md"],
+      "answer_contains": [["14 months", "fourteen months"]],
       "kind": "linked"
     },
     {
       "id": "how-warm-first-thing",
       "question": "How warm does the place get first thing?",
-      "needs_note": "house/thermostat.md",
-      "answer_contains": ["19 degrees", "19 degree", "nineteen degrees"],
+      "needs_notes": ["house/thermostat.md"],
+      "answer_contains": [["19 degrees", "19 degree", "nineteen degrees"]],
       "kind": "linked"
     },
     {
       "id": "who-insures-the-volvo",
       "question": "Who insures the silver Volvo?",
-      "needs_note": "car/motor-policy.md",
-      "answer_contains": ["Aviva"],
+      "needs_notes": ["car/motor-policy.md"],
+      "answer_contains": [["Aviva"]],
       "kind": "linked"
     },
     {
       "id": "volvo-prang-excess",
       "question": "How much do we pay ourselves if the Volvo gets pranged?",
-      "needs_note": "car/motor-policy.md",
-      "answer_contains": ["350"],
+      "needs_notes": ["car/motor-policy.md"],
+      "answer_contains": [["350"]],
       "kind": "linked"
     },
     {
       "id": "volvo-tyres-where",
       "question": "Where do we get the tyres on the Volvo seen to?",
-      "needs_note": "car/mill-lane.md",
-      "answer_contains": ["Dunphy"],
+      "needs_notes": ["car/mill-lane.md"],
+      "answer_contains": [["Dunphy", "Ronan", "Mill Lane"]],
       "kind": "linked"
     },
     {
       "id": "tuesday-after-children",
       "question": "What happens on a Tuesday once the children are finished?",
-      "needs_note": "family/after-school.md",
-      "answer_contains": ["Lindqvist", "chess"],
+      "needs_notes": ["family/after-school.md"],
+      "answer_contains": [["Lindqvist", "chess"]],
       "kind": "linked"
     },
     {
       "id": "reach-the-key-holder",
       "question": "How do we reach the woman who keeps our spare key?",
-      "needs_note": "family/mrs-achebe.md",
-      "answer_contains": ["07700 900412", "07700900412"],
+      "needs_notes": ["family/mrs-achebe.md"],
+      "answer_contains": [["07700 900412", "07700900412"]],
       "kind": "linked"
     },
     {
       "id": "standing-order-second",
       "question": "Who do the standing orders go to on the second?",
-      "needs_note": "money/mortgage.md",
-      "answer_contains": ["Nationwide"],
+      "needs_notes": ["money/mortgage.md"],
+      "answer_contains": [["Nationwide"]],
       "kind": "linked"
     },
     {
       "id": "biggest-standing-order",
       "question": "Of the big standing orders, which one costs the most?",
-      "needs_note": "money/mortgage.md",
-      "answer_contains": ["1180", "1,180"],
+      "needs_notes": ["money/mortgage.md"],
+      "answer_contains": [["1180", "1,180"]],
       "kind": "linked"
     },
     {
       "id": "what-we-pay-for-energy",
       "question": "What do we pay for energy?",
-      "needs_note": "money/energy-tariff.md",
-      "answer_contains": ["Octopus", "62p"],
+      "needs_notes": ["money/energy-tariff.md"],
+      "answer_contains": [["Octopus", "62p"]],
       "kind": "linked"
     },
     {
       "id": "get-into-where-tools-are",
       "question": "How do we get into where the tools for plot 12 are kept?",
-      "needs_note": "garden/shed.md",
-      "answer_contains": ["2208"],
+      "needs_notes": ["garden/shed.md"],
+      "answer_contains": [["2208"]],
       "kind": "linked"
     },
     {
       "id": "green-waste-plot-12",
       "question": "What do we do with the green waste from plot 12?",
-      "needs_note": "garden/compost.md",
-      "answer_contains": ["six weeks", "6 weeks"],
+      "needs_notes": ["garden/compost.md"],
+      "answer_contains": [["six weeks", "6 weeks"]],
       "kind": "linked"
+    },
+
+    {
+      "id": "heating-service-and-warmth",
+      "question": "Who services the radiators, and how warm is the place kept?",
+      "needs_notes": ["house/boiler.md", "house/thermostat.md"],
+      "answer_contains": [
+        ["Kavanagh"],
+        ["19 degrees", "19 degree", "nineteen degrees"]
+      ],
+      "kind": "linked"
+    },
+    {
+      "id": "volvo-repair-and-payer",
+      "question": "If the Volvo is dented, who repairs it and who pays?",
+      "needs_notes": ["car/mill-lane.md", "car/motor-policy.md"],
+      "answer_contains": [["Dunphy", "Ronan", "Mill Lane"], ["Aviva", "350"]],
+      "kind": "linked"
+    },
+    {
+      "id": "long-day-club-and-neighbour",
+      "question": "On the long day, who takes the children after, and what is the number for the neighbour with our key?",
+      "needs_notes": ["family/after-school.md", "family/mrs-achebe.md"],
+      "answer_contains": [
+        ["Lindqvist", "chess"],
+        ["07700 900412", "07700900412"]
+      ],
+      "kind": "linked"
+    },
+    {
+      "id": "two-big-outgoings",
+      "question": "What are the two big ones we pay, and who do they go to?",
+      "needs_notes": ["money/mortgage.md", "money/energy-tariff.md"],
+      "answer_contains": [["Nationwide"], ["Octopus"]],
+      "kind": "linked"
+    },
+    {
+      "id": "plot-12-tools-and-waste",
+      "question": "On plot 12, how do I get at the tools, and where does the green waste go?",
+      "needs_notes": ["garden/shed.md", "garden/compost.md"],
+      "answer_contains": [
+        ["2208"],
+        ["six weeks", "6 weeks", "nearest the fence"]
+      ],
+      "kind": "linked"
+    },
+    {
+      "id": "wifi-and-shed-codes",
+      "question": "What is the wifi password, and the code for the shed padlock?",
+      "needs_notes": ["house/wifi.md", "garden/shed.md"],
+      "answer_contains": [["SALTMARSH-42"], ["2208"]],
+      "kind": "direct"
     },
 
     {
       "id": "wifi-password",
       "question": "What is the wifi password?",
-      "needs_note": "house/wifi.md",
-      "answer_contains": ["SALTMARSH-42"],
+      "needs_notes": ["house/wifi.md"],
+      "answer_contains": [["SALTMARSH-42"]],
       "kind": "direct"
     },
     {
       "id": "thermostat-override-code",
       "question": "What is the override code on the thermostat dial?",
-      "needs_note": "house/thermostat.md",
-      "answer_contains": ["4471"],
+      "needs_notes": ["house/thermostat.md"],
+      "answer_contains": [["4471"]],
       "kind": "direct"
     },
     {
       "id": "boiler-pressure",
       "question": "What pressure should the boiler rest at?",
-      "needs_note": "house/boiler.md",
-      "answer_contains": ["1.5 bar", "1.5"],
+      "needs_notes": ["house/boiler.md"],
+      "answer_contains": [["1.5 bar", "1.5"]],
       "kind": "direct"
     },
     {
       "id": "lasagne-oven-time",
       "question": "How long does the lasagne need in the oven?",
-      "needs_note": "kitchen/lasagne.md",
-      "answer_contains": ["fifty minutes", "50 minutes"],
+      "needs_notes": ["kitchen/lasagne.md"],
+      "answer_contains": [["fifty minutes", "50 minutes"]],
       "kind": "direct"
     },
     {
       "id": "lasagne-temperature",
       "question": "What temperature do I cook the lasagne at?",
-      "needs_note": "kitchen/lasagne.md",
-      "answer_contains": ["180"],
+      "needs_notes": ["kitchen/lasagne.md"],
+      "answer_contains": [["180"]],
       "kind": "direct"
     },
     {
       "id": "passport-renewals-when",
       "question": "When did the passport renewals go in?",
-      "needs_note": "travel/passports.md",
-      "answer_contains": ["2 February", "2nd February", "February"],
+      "needs_notes": ["travel/passports.md"],
+      "answer_contains": [["2 February", "2nd February", "February"]],
       "kind": "direct"
     },
     {
       "id": "mot-due",
       "question": "When does the MOT fall due on the Volvo?",
-      "needs_note": "car/estate.md",
-      "answer_contains": ["spring"],
+      "needs_notes": ["car/estate.md"],
+      "answer_contains": [["spring"]],
       "kind": "direct"
     },
     {
       "id": "shed-padlock",
       "question": "What is the padlock code on the shed?",
-      "needs_note": "garden/shed.md",
-      "answer_contains": ["2208"],
+      "needs_notes": ["garden/shed.md"],
+      "answer_contains": [["2208"]],
       "kind": "direct"
     },
     {
       "id": "which-mower",
       "question": "Which mower is in the shed?",
-      "needs_note": "garden/shed.md",
-      "answer_contains": ["Hayter"],
+      "needs_notes": ["garden/shed.md"],
+      "answer_contains": [["Hayter"]],
       "kind": "direct"
     },
     {
       "id": "standing-charge",
       "question": "What is the standing charge on the power supply?",
-      "needs_note": "money/energy-tariff.md",
-      "answer_contains": ["62p", "62"],
+      "needs_notes": ["money/energy-tariff.md"],
+      "answer_contains": [["62p", "62"]],
       "kind": "direct"
     },
     {
       "id": "motor-policy-renewal",
       "question": "When does the motor policy renew?",
-      "needs_note": "car/motor-policy.md",
-      "answer_contains": ["3 March", "March"],
+      "needs_notes": ["car/motor-policy.md"],
+      "answer_contains": [["3 March", "March"]],
       "kind": "direct"
     }
   ]
