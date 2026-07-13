@@ -43,6 +43,16 @@ class Settings(BaseSettings):
     chunk_size_chars: int = 1_200
     chunk_overlap_chars: int = 160
     retrieval_top_k: int = 5
+    # A note has to hold its own next to the best match for the question: keep only
+    # the hits scoring at least this fraction of the top one. A fraction and not a
+    # score, because a BM25 score means nothing across queries. 0 turns it off and
+    # hands back the whole top-k, junk and all.
+    #
+    # 0.5 costs a real answer on the eval corpus — "the woman who keeps our spare
+    # key" ranks the garage that keeps a spare wheel-nut key above the note that
+    # names her, and cutting that hard drops the note that leads to the answer. 0.4
+    # keeps every answer with a step of room to spare.
+    retrieval_score_floor: float = 0.40
     memory_top_k: int = 4
     conversation_history_limit: int = 16
 

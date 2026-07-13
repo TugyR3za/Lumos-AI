@@ -81,9 +81,10 @@ class Question:
 @dataclass(frozen=True, slots=True)
 class Retrieval:
     question: Question
-    seeds: tuple[str, ...]  # notes BM25 found
+    seeds: tuple[str, ...]  # notes BM25 found — and exactly what becomes a source card
     linked: tuple[str, ...]  # notes the graph added behind them
     linked_chars: int
+    via: dict[str, tuple[str, ...]]  # each linked note, and the seeds that reached it
 
     @property
     def reached(self) -> set[str]:
@@ -120,6 +121,23 @@ class Retrieval:
     def noise(self) -> int:
         """Linked notes nobody needed — the cost of the expansion."""
         return len(set(self.linked) - set(self.question.needs_notes))
+
+    @property
+    def earned(self) -> set[str]:
+        """The search hits that earned their card: they hold an answer, or they led to
+        one. A seed is not junk merely for failing to be the answer itself — on a
+        `linked` question the answer is never a seed, and the note that reached it is
+        the whole point."""
+        needed = set(self.question.needs_notes)
+        led_there = {
+            seed for note, seeds in self.via.items() if note in needed for seed in seeds
+        }
+        return set(self.seeds) & (needed | led_there)
+
+    @property
+    def seed_noise(self) -> int:
+        """Cards the reader is shown that neither answered the question nor led to it."""
+        return len(set(self.seeds) - self.earned)
 
 
 @dataclass(frozen=True, slots=True)
@@ -290,6 +308,7 @@ def evaluate_retrieval(
                 seeds=tuple(dict.fromkeys(str(row["path"]) for row in seeds)),
                 linked=tuple(note.path for note in linked),
                 linked_chars=sum(len(note.content) for note in linked),
+                via={note.path: note.via for note in linked},
             )
         )
     return results

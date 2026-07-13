@@ -12,6 +12,7 @@ from typing import Any
 from lumos.core.time import utc_now_iso
 from lumos.graph import store as graph_store
 from lumos.graph.extract import NoteRefs
+from lumos.retrieval.relevance import search_terms
 
 
 class Database:
@@ -317,7 +318,7 @@ class Database:
         return {str(row["path"]): dict(row) for row in rows}
 
     def search_chunks(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
-        terms = re.findall(r"[^\W_]+", query, flags=re.UNICODE)
+        terms = search_terms(query)
         if not terms:
             return []
 
@@ -363,6 +364,13 @@ class Database:
 
         results: list[dict[str, Any]] = []
         for row in rows:
+            # FTS5's bm25() is negative and *more* negative the better the match, so
+            # the magnitude is the relevance. It used to be squashed through
+            # 1/(1+|rank|), which inverted it: the note that answered the question
+            # scored 0.12 and a filler note that matched nothing but "the" scored 1.0.
+            # The ordering was right — that comes from the SQL — so nothing looked
+            # broken, but every score attached to a source card was upside down, and
+            # no floor could be built on a number that meant the opposite of itself.
             rank = float(row["rank"])
             results.append(
                 {
@@ -370,7 +378,7 @@ class Database:
                     "title": row["title"],
                     "path": row["path"],
                     "content": row["content"],
-                    "score": 1.0 / (1.0 + abs(rank)),
+                    "score": abs(rank),  # higher is a better match; only within a query
                 }
             )
         return results

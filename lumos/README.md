@@ -152,6 +152,18 @@ file -> UTF-8 text -> paragraph-aware chunks -> SQLite -> FTS5/BM25 search
 
 This is intentionally lightweight. A future embedding retriever can implement the same retrieval interface without changing the chat agent or UI.
 
+BM25 ranks; two rules decide what is worth showing you.
+
+**A word that means nothing cannot tell one note from another.** "Who do we call when the radiators go cold?" is a question about radiators, not about "do" — but in a folder of thirty notes "do" appears in a handful, so it carries real statistical weight while carrying no meaning, and BM25 will happily rank a note on library fines above the heating note. Function words are dropped before the search. Unless they are all there is: "Where is the will?" is a question about a will, and a query made only of them means them literally. (The list is English, so a query in another language passes through untouched.)
+
+**A hit has to hold its own next to the best hit for its question.**
+
+```dotenv
+LUMOS_RETRIEVAL_SCORE_FLOOR=0.40
+```
+
+Keep only the hits scoring at least this fraction of the top one — a fraction, not a score, because a BM25 score means nothing from one query to the next. `0` turns it off and hands back the whole top-k, junk and all. Together the two rules took the eval corpus from five source cards a question, four of them notes about library fines and where the remote lives, down to one and a half — without costing a single answer.
+
 ## Knowledge graph
 
 Ingest also derives a graph from your notes: a node per note, per `#tag`, and per `[[wikilink]]` target that no note backs yet, joined by `links_to`, `tagged`, and `mentions` edges. It is written on every ingest, so it is always as current as the index.

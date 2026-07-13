@@ -71,16 +71,21 @@ def report_retrieval(results: list[Retrieval]) -> None:
         print(f"    {label:<14} BM25 {seeds_ok:>2}/{len(group)}"
               f"    BM25 + graph {graph_ok:>2}/{len(group)}")
 
+    seeds = [len(r.seeds) for r in results]
     counts = [len(r.linked) for r in results]
     chars = [r.linked_chars for r in results]
     expanded = [r for r in results if r.linked]
     useful = [r for r in expanded if set(r.linked) & set(r.question.needs_notes)]
 
-    print("\nCOST  ·  what the expansion put in the prompt")
+    print("\nCOST  ·  what reached the model, and what the reader is shown")
+    # The seeds are the source cards: whatever the search keeps, the user sees.
+    print(f"  search hits per question .. {statistics.mean(seeds):.1f} mean, {max(seeds)} max")
+    print(f"  cards that earned nothing .. {sum(r.seed_noise for r in results)} of {sum(seeds)}"
+          "   (neither the answer nor the note that led to it)")
     print(f"  linked notes per question  {statistics.mean(counts):.1f} mean, {max(counts)} max")
+    print(f"  linked notes nobody needed  {sum(r.noise for r in results)} of {sum(counts)}")
     print(f"  extra characters ......... {statistics.mean(chars):,.0f} mean, "
           f"{max(chars):,} max  (ceiling 2,400)")
-    print(f"  linked notes nobody needed  {sum(r.noise for r in results)} of {sum(counts)}")
     print(f"  questions it paid off in ... {len(useful)}/{len(expanded)} that got any")
 
     if unfair:

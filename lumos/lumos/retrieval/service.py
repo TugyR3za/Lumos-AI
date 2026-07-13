@@ -20,6 +20,7 @@ from dataclasses import dataclass
 
 from lumos.graph.service import GraphService
 from lumos.memory.database import Database
+from lumos.retrieval.relevance import above_floor
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,15 +43,25 @@ class RetrievalService:
         expand: bool = False,
         max_linked: int = 3,
         max_linked_chars: int = 800,
+        score_floor: float = 0.40,
     ) -> None:
         self.database = database
         self.graph = graph
         self.expand = expand
         self.max_linked = max_linked
         self.max_linked_chars = max_linked_chars
+        self.score_floor = score_floor
 
     def search_notes(self, query: str, limit: int = 5) -> list[dict[str, object]]:
-        return self.database.search_chunks(query=query, limit=limit)
+        """The notes that match, minus the ones that only look like they do.
+
+        The floor only ever removes. A search that found five notes can come back
+        with one, but never with a note the search did not rank — so the seeds the
+        graph expands from are a subset of the seeds it had before, and a question
+        that used to reach its answer still reaches it.
+        """
+        rows = self.database.search_chunks(query=query, limit=limit)
+        return above_floor(rows, self.score_floor)
 
     def linked_notes(self, seed_rows: Sequence[dict[str, object]]) -> list[LinkedNote]:
         """The notes one ``links_to`` hop from the search hits, forwards or back.

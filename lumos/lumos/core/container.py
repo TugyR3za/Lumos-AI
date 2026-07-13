@@ -57,6 +57,7 @@ def build_container(settings: Settings) -> LumosContainer:
         expand=settings.graph_expand_retrieval,
         max_linked=settings.graph_expand_max_notes,
         max_linked_chars=settings.graph_expand_max_chars,
+        score_floor=settings.retrieval_score_floor,
     )
     ingestor = NotesIngestor(
         database,
