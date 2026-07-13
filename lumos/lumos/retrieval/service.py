@@ -107,16 +107,41 @@ class RetrievalService:
         results: list[dict[str, object]],
         linked: Sequence[LinkedNote] = (),
     ) -> str:
+        """The notes as the model will see them: one block each, filename first.
+
+        One block a *note*, not a chunk. A long note can win several chunks in the
+        same search, and each used to arrive under its own ``[NOTE n]`` header — the
+        same note three times over, wearing three different numbers, as though the
+        folder agreed with itself three times.
+
+        And no numbers. A bracketed index is shaped exactly like a citation key, so a
+        model reaches for it as one: 43% of the eval's answers quoted ``[NOTE 1]`` at
+        a reader who has never seen this prompt and cannot know what it means. The
+        filename is the only name a note has that means anything outside this string,
+        so it is the only handle left to reach for.
+
+        The header is a word and not a rule of dashes, because a note may well open
+        with ``---`` — YAML frontmatter survives into the indexed text, and Obsidian
+        writes it as a matter of course. A delimiter a note can forge is no delimiter.
+        """
+        chunks: dict[str, list[str]] = {}
+        titles: dict[str, str] = {}
+        for result in results:
+            path = str(result["path"])
+            titles.setdefault(path, str(result["title"]))
+            chunks.setdefault(path, []).append(str(result["content"]))
+
         blocks = [
-            f"[NOTE {index}] {result['title']} ({result['path']})\n{result['content']}"
-            for index, result in enumerate(results, start=1)
+            f"NOTE {path} · {titles[path]}\n" + "\n\n".join(parts)
+            for path, parts in chunks.items()
         ]
-        # Labelled apart from the hits, and last: the model is told plainly that a
-        # link put these here, not the question, so it can weigh them accordingly.
+        # Linked notes come last and say where they came from. The question did not
+        # match them; a note it did match points at them, and the model is told so
+        # plainly enough to judge them rather than either trust or dismiss them.
         blocks.extend(
-            f"[LINKED NOTE {index}] {note.title} ({note.path}) — "
-            f"linked with {', '.join(note.via)}; not a search match\n{note.content}"
-            for index, note in enumerate(linked, start=1)
+            f"NOTE {note.path} · {note.title} · not a search hit; "
+            f"linked from {', '.join(note.via)}\n{note.content}"
+            for note in linked
         )
         return "\n\n".join(blocks)
 

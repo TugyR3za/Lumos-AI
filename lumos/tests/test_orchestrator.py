@@ -259,12 +259,35 @@ async def test_linked_notes_are_read_by_the_model_but_never_cited(tmp_path: Path
     response = await ask_about_quartz(agent)
 
     prompt = provider.seen_messages[0][0]["content"]
-    assert "[NOTE 1] Kitchen (kitchen.md)" in prompt
-    assert "[LINKED NOTE 1] Pantry (pantry.md)" in prompt
+    assert "NOTE kitchen.md · Kitchen" in prompt
+    assert "NOTE pantry.md · Pantry · not a search hit; linked from kitchen.md" in prompt
     assert "Shelving and jars" in prompt  # the model really was shown the note
     # And yet it is not a citation: the search never matched it, so it is context,
     # not evidence. A note the model leans on it must name in the answer instead.
     assert [source.location for source in response.sources] == ["kitchen.md"]
+
+
+@pytest.mark.asyncio
+async def test_the_note_guidance_rides_only_with_the_notes(tmp_path: Path):
+    provider = CapturingProvider()
+    database, agent = make_agent(tmp_path, provider, graph_enabled=True, expand=True)
+    index_linked_notes(database)
+
+    await ask_about_quartz(agent)
+    await agent.chat(
+        user_message="quartz",
+        conversation_id=None,
+        route="auto",
+        use_notes=False,
+        use_web=False,
+    )
+    with_notes, without_notes = (messages[0]["content"] for messages in provider.seen_messages[:2])
+
+    assert "LOCAL NOTE CONTEXT" in with_notes
+    assert "do not answer out of the first and stop" in with_notes  # several notes, one answer
+    assert "not on how it arrived" in with_notes  # a linked note is not a lesser note
+    # And a turn with no notes pays nothing at all for advice about notes.
+    assert "LOCAL NOTE CONTEXT" not in without_notes
 
 
 @pytest.mark.asyncio
@@ -282,7 +305,7 @@ async def test_the_graph_only_ever_adds_to_the_prompt(tmp_path: Path):
     off_prompt = off_provider.seen_messages[0][0]["content"]
     on_prompt = on_provider.seen_messages[0][0]["content"]
 
-    assert "LINKED NOTE" not in off_prompt  # reads off: today's prompt, unchanged
-    assert "[LINKED NOTE 1] Pantry (pantry.md)" in on_prompt
+    assert "pantry.md" not in off_prompt  # reads off: the search hits, and no more
+    assert "NOTE pantry.md · Pantry · not a search hit" in on_prompt
     # Byte for byte, the graph appends and rewrites nothing that was already there.
     assert on_prompt.startswith(off_prompt)

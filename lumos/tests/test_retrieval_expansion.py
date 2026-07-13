@@ -171,30 +171,60 @@ def test_a_note_with_no_text_is_skipped(tmp_path: Path):
     assert expand_query(retrieval) == ["appliances.md"]
 
 
-def test_context_without_links_is_what_it_always_was(tmp_path: Path):
+def test_each_note_gets_one_block_headed_by_its_filename(tmp_path: Path):
     _, retrieval = build(tmp_path)
     seeds = retrieval.search_notes("quartz", limit=5)
 
-    # The graph must be able to add nothing without changing a byte of the rest.
-    # Which hit ranks first is BM25's business, not this slice's, so the shape is
-    # what gets pinned: the numbered [NOTE n] blocks, and nothing beside them.
     context = retrieval.format_context(seeds)
+
+    # The filename leads, because it is the only name a note has that means anything
+    # to whoever reads the answer. There is no [NOTE n] to cite in its place.
     assert context == retrieval.format_context(seeds, [])
-    assert context.startswith("[NOTE 1] ")
-    assert "[NOTE 2] " in context
-    assert "LINKED NOTE" not in context
+    assert context.startswith("NOTE ")
+    assert "NOTE kitchen.md · Kitchen\n" in context
+    assert "[NOTE" not in context
 
 
-def test_linked_notes_follow_the_hits_and_say_why_they_are_there(tmp_path: Path):
+def test_a_note_that_wins_several_chunks_is_still_one_note():
+    rows: list[dict[str, object]] = [
+        {"title": "Kitchen", "path": "kitchen.md", "content": "Quartz counters."},
+        {"title": "Kitchen", "path": "kitchen.md", "content": "And a new sink."},
+        {"title": "Pantry", "path": "pantry.md", "content": "Shelving and jars."},
+    ]
+
+    context = RetrievalService.format_context(rows)
+
+    # Two chunks of one note used to arrive as two notes under two numbers, and the
+    # folder appeared to agree with itself twice.
+    assert context.count("NOTE kitchen.md") == 1
+    assert "Quartz counters.\n\nAnd a new sink." in context
+    assert context.count("NOTE ") == 2
+
+
+def test_a_note_cannot_forge_the_header_that_introduces_it():
+    # Obsidian writes YAML frontmatter as a matter of course and it survives into the
+    # indexed text, so a note's own first line is very often `---`. A rule of dashes
+    # would be a delimiter any note could counterfeit.
+    rows: list[dict[str, object]] = [
+        {"title": "Boiler", "path": "boiler.md", "content": "---\ntitle: Boiler\n---\n# Boiler"}
+    ]
+
+    context = RetrievalService.format_context(rows)
+
+    assert context.startswith("NOTE boiler.md · Boiler\n")
+    assert not context.startswith("---")
+
+
+def test_linked_notes_follow_the_hits_and_say_how_they_got_there(tmp_path: Path):
     _, retrieval = build(tmp_path)
     seeds = retrieval.search_notes("quartz", limit=5)
 
     context = retrieval.format_context(seeds, retrieval.linked_notes(seeds))
 
-    assert context.index("[NOTE 1]") < context.index("[LINKED NOTE 1]")
+    assert context.index("NOTE kitchen.md") < context.index("NOTE pantry.md")
     assert (
-        "[LINKED NOTE 1] Pantry (pantry.md) — linked with kitchen.md, utility.md; "
-        "not a search match\n# Pantry" in context
+        "NOTE pantry.md · Pantry · not a search hit; linked from kitchen.md, utility.md\n"
+        "# Pantry" in context
     )
 
 
