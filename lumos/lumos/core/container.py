@@ -126,6 +126,7 @@ def build_container(settings: Settings) -> LumosContainer:
         web_search_max_results=settings.web_search_max_results,
         max_tool_rounds=settings.max_tool_rounds,
         memory_top_k=settings.memory_top_k,
+        memory_score_floor=settings.memory_score_floor,
     )
     return LumosContainer(
         settings=settings,

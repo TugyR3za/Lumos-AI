@@ -42,19 +42,32 @@ STOPWORDS = frozenset(
     same she should so some such than that the their theirs them themselves then there
     these they this those through to too under until up very was we were what when
     where which while who whom why with would you your yours yourself yourselves
+    s t
     """.split()  # noqa: SIM905 — a list of 120 quoted words is not more readable than this
 )
+# "s" and "t" are there because the tokenizer splits on the apostrophe: "Mum's" becomes
+# "mum" and "s", and so does "Sam's" — which is how a question about Mum's birthday came
+# back with Sam's swimming lesson attached. A possessive is not a word two things share.
 
 
-def search_terms(query: str) -> list[str]:
+def search_terms(query: str, *, literal_when_empty: bool = True) -> list[str]:
     """The words in ``query`` worth searching for, in order.
 
     Everything but the function words — or, if that is nothing, the words themselves,
-    because a question made only of them is asking about one of them.
+    because a question made only of them may be asking about one of them.
+
+    ``literal_when_empty`` is what note search wants and memory search does not. A
+    question with nothing but function words in it is usually not a question at all
+    ("how are you?"), and the cost of taking it literally is not the same on both
+    sides: a stray note is a card nobody reads, while a stray memory is a private
+    fact about this family volunteered to whichever provider answers, for nothing.
+    Notes keep the benefit of the doubt. Memories do not get to be guessed at.
     """
     terms = re.findall(r"[^\W_]+", query, flags=re.UNICODE)
     meaningful = [term for term in terms if term.casefold() not in STOPWORDS]
-    return meaningful or terms
+    if meaningful:
+        return meaningful
+    return terms if literal_when_empty else []
 
 
 def above_floor(rows: list[dict[str, Any]], floor: float) -> list[dict[str, Any]]:

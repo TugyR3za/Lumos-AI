@@ -230,7 +230,15 @@ Current tools:
 - `search_web`
 - Optional `save_memory` when `LUMOS_ALLOW_MODEL_MEMORY_WRITES=true`
 
-Durable model-written memory is disabled by default until Lumos has an approval and review interface. Memories you save yourself (CLI `/remember`) are searched with FTS5 and injected into the model's context on every turn. Conversation history is always stored locally in SQLite.
+Durable model-written memory is disabled by default until Lumos has an approval and review interface. Memories you save yourself (CLI `/remember`) are searched with FTS5 every turn, and the ones that bear on your question are injected into the model's context. Conversation history is always stored locally in SQLite.
+
+Memory search follows the same two rules as note search — function words are not searched for, and a hit must hold its own against the best match — but it is held to a stricter bar, and for a different reason:
+
+```dotenv
+LUMOS_MEMORY_SCORE_FLOOR=0.50
+```
+
+A junk note is a card nobody reads. A junk memory is a private fact about your family — an allergy, a mortgage, where the spare key is — sent to whichever provider answers a question that had nothing to do with it. So the bar to *send* a memory is higher than the bar to *show* a note, and a question made only of function words ("how are you?") recalls nothing at all rather than being taken literally. On a twenty-memory set this took what gets recalled from 3.3 memories a question, two thirds of them unasked for, down to 1.1 — without losing a single memory that was.
 
 ## API endpoints
 

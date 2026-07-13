@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from functools import partial
 from typing import Literal
 
 from lumos.agent.prompts import build_system_prompt
@@ -32,6 +33,7 @@ class AgentOrchestrator:
         web_search_max_results: int,
         max_tool_rounds: int,
         memory_top_k: int = 4,
+        memory_score_floor: float = 0.5,
     ) -> None:
         self.database = database
         self.providers = providers
@@ -43,6 +45,7 @@ class AgentOrchestrator:
         self.web_search_max_results = web_search_max_results
         self.max_tool_rounds = max_tool_rounds
         self.memory_top_k = memory_top_k
+        self.memory_score_floor = memory_score_floor
 
     async def chat(
         self,
@@ -90,9 +93,12 @@ class AgentOrchestrator:
         web_context = self._format_web_context(web_rows)
 
         memory_rows = await asyncio.to_thread(
-            self.database.search_memories,
-            user_message,
-            limit=self.memory_top_k,
+            partial(
+                self.database.search_memories,
+                user_message,
+                limit=self.memory_top_k,
+                score_floor=self.memory_score_floor,
+            )
         )
         memory_context = self._format_memory_context(memory_rows)
 

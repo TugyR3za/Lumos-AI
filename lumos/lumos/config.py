@@ -54,6 +54,13 @@ class Settings(BaseSettings):
     # keeps every answer with a step of room to spare.
     retrieval_score_floor: float = 0.40
     memory_top_k: int = 4
+    # Memories get their own floor, and a stricter one, because they are not notes.
+    # A memory is one short sentence, so the scores bunch up and the same fraction
+    # cuts differently; and every memory recalled is a private fact about this family
+    # posted to whatever answers the question, so the bar to send one should be higher
+    # than the bar to show a note. Measured safe to 0.6 on the memory set, including
+    # questions that need two memories at once. 0 turns it off.
+    memory_score_floor: float = 0.50
     conversation_history_limit: int = 16
 
     # Knowledge graph derived from notes at ingest time. Reads are off by

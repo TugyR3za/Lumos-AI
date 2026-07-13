@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 import sqlite3
 import uuid
 from collections.abc import Iterator, Sequence
@@ -12,7 +11,7 @@ from typing import Any
 from lumos.core.time import utc_now_iso
 from lumos.graph import store as graph_store
 from lumos.graph.extract import NoteRefs
-from lumos.retrieval.relevance import search_terms
+from lumos.retrieval.relevance import above_floor, search_terms
 
 
 class Database:
@@ -416,8 +415,28 @@ class Database:
         *,
         namespace: str = "personal",
         limit: int = 5,
+        score_floor: float = 0.5,
     ) -> list[dict[str, Any]]:
-        terms = re.findall(r"[^\W_]+", query, flags=re.UNICODE)
+        """The memories worth recalling for this question.
+
+        The same two rules as note search, and mostly for the same reason — but the
+        weight falls differently. A memory is one short sentence, so "is" turns up in
+        half of them and BM25 scores those matches at nothing at all: strike the
+        function words from the question and the junk does not merely rank low, it
+        stops matching. On the eval set that alone takes what gets recalled from 3.6
+        memories a question to 1.2, and the floor barely has anything left to do.
+
+        What the floor still does matters, though. It stops a question about pizza
+        night from dragging in the bins going out on Thursday *night*, and — because
+        a query of nothing but function words scores every memory at zero — it stops
+        an idle "what about it?" from posting four unrelated facts about this family
+        to whichever provider answers. Which is the real point: a memory nobody asked
+        for is not noise in a list, it is a private thing sent somewhere for nothing.
+        """
+        # Unlike note search, a question made only of function words gets nothing at
+        # all. "How are you?" is conversation, and it has no business posting this
+        # family's dietary requirements to a provider on the strength of the word "are".
+        terms = search_terms(query, literal_when_empty=False)
         if not terms:
             return []
         with self.connect() as db:
@@ -446,4 +465,9 @@ class Database:
                     """,
                     (namespace, f"%{terms[0]}%", limit),
                 ).fetchall()
-        return [dict(row) for row in rows]
+
+        # bm25() is negative and more negative the better, and the LIKE fallback hands
+        # back a flat +1.0, so the raw rank means two different things depending on
+        # which branch ran. The magnitude means one thing in both: how good the match is.
+        results = [dict(row) | {"score": abs(float(row["rank"]))} for row in rows]
+        return above_floor(results, score_floor)
