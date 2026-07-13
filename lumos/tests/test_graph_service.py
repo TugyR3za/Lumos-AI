@@ -66,6 +66,42 @@ def test_related_notes_rank_by_how_many_seeds_reach_them(tmp_path: Path):
     assert related[0].via == ("a.md", "b.md")  # sorted, so callers can cite the reason
 
 
+def test_related_notes_break_ties_on_the_best_seed_not_the_alphabet(tmp_path: Path):
+    # The defect the Graph V1 eval found. Every candidate tied at one connection, so
+    # the alphabet chose, and a note the top hit linked straight to lost its only slot
+    # to one an also-ran happened to mention.
+    notes, ingestor, graph = build(tmp_path, max_related=1)
+    (notes / "estate.md").write_text("See [[policy]].", encoding="utf-8")
+    (notes / "budget.md").write_text("See [[compost]].", encoding="utf-8")
+    (notes / "policy.md").write_text("The answer.", encoding="utf-8")
+    (notes / "compost.md").write_text("Not the answer.", encoding="utf-8")
+    ingestor.ingest_all()
+
+    # 'compost' sorts first and used to take the slot. Now the seed that ranked first
+    # takes it, and what that seed points at comes along.
+    assert [note.slug for note in graph.related_notes(["estate.md", "budget.md"])] == ["policy"]
+    # Hand the same two seeds over the other way round and the other note wins: the
+    # order is the signal, not anything the notes themselves decide.
+    assert [note.slug for note in graph.related_notes(["budget.md", "estate.md"])] == ["compost"]
+
+
+def test_seeds_agreeing_still_outrank_a_better_seed(tmp_path: Path):
+    # Rank only breaks ties. Two seeds agreeing on a note remains the stronger signal
+    # than one better seed pointing elsewhere — and here the alphabet would have said
+    # otherwise too, so this pins that agreement still comes first.
+    notes, ingestor, graph = build(tmp_path, max_related=1)
+    (notes / "top.md").write_text("See [[alpha]].", encoding="utf-8")
+    (notes / "mid.md").write_text("See [[zulu]].", encoding="utf-8")
+    (notes / "low.md").write_text("Also see [[zulu]].", encoding="utf-8")
+    (notes / "alpha.md").write_text("One seed, but the best one.", encoding="utf-8")
+    (notes / "zulu.md").write_text("Two seeds, both worse.", encoding="utf-8")
+    ingestor.ingest_all()
+
+    related = graph.related_notes(["top.md", "mid.md", "low.md"])
+
+    assert [(note.slug, note.connections) for note in related] == [("zulu", 2)]
+
+
 def test_related_notes_never_return_a_seed(tmp_path: Path):
     notes, ingestor, graph = build(tmp_path)
     (notes / "a.md").write_text("See [[b]].", encoding="utf-8")

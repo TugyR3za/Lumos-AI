@@ -75,8 +75,10 @@ class RetrievalService:
         if self.max_linked <= 0 or self.max_linked_chars <= 0:
             return []
 
-        # Seeds are chunks, and one note can contribute several of them; the graph
-        # is asked about notes, so the paths collapse to a set (order preserved).
+        # Seeds are chunks and one note can contribute several, so the paths collapse
+        # to one entry a note — the first, which is that note's best-ranked chunk. The
+        # order is BM25's, and it is the ranking: related_notes breaks its ties on it,
+        # so a note the top hit links to outranks one the last hit merely mentions.
         seeds = list(dict.fromkeys(str(row["path"]) for row in seed_rows))
 
         # Inert while graph reads are off: it answers empty without a connection,

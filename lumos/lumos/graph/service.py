@@ -116,14 +116,24 @@ class GraphService:
     def related_notes(
         self, seed_paths: Sequence[str], *, limit: int | None = None
     ) -> list[RelatedNote]:
-        """Notes one link away from any of ``seed_paths`` (document paths, as
-        returned by note search), ranked by how many seeds reach them."""
+        """Notes one link away from any of ``seed_paths`` — document paths **in
+        search order, best match first** — ranked by how many seeds reach them and
+        then by the best-ranked seed that does.
+
+        That order is load-bearing. It carries the only relevance signal the graph
+        has: a note linked from the first hit is a better bet than one linked from
+        the fifth. Without it the cap falls back on the alphabet, and a note the top
+        hit points straight at loses its place to one an also-ran happened to mention.
+        """
         cap = self.max_related if limit is None else limit
         if not self.enabled or not seed_paths or cap <= 0:
             return []
 
+        # One entry per note, first occurrence winning: a seed's position is its rank.
+        rank = {path: position for position, path in enumerate(dict.fromkeys(seed_paths))}
+
         with self.database.connect() as db:
-            seed_rows = store.fetch_note_nodes_by_path(db, list(dict.fromkeys(seed_paths)))
+            seed_rows = store.fetch_note_nodes_by_path(db, list(rank))
             if not seed_rows:
                 return []
             seeds = {int(row["id"]): str(row["path"]) for row in seed_rows}
@@ -149,7 +159,13 @@ class GraphService:
             )
             for node_id, seed_paths_hit in via.items()
         ]
-        related.sort(key=lambda note: (-note.connections, note.slug))
+        # Agreement first: a note two seeds both reach beats one a single seed
+        # mentions in passing. Then the best seed that reached it, so search rank
+        # decides which survives the cap. The slug settles nothing but a true tie —
+        # two notes of equal standing — and is there only to keep the prompt stable.
+        related.sort(
+            key=lambda note: (-note.connections, min(rank[seed] for seed in note.via), note.slug)
+        )
         return related[:cap]
 
 

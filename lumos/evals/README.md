@@ -86,19 +86,24 @@ Read these in order.
 
 | | BM25 alone | BM25 + graph |
 |---|---|---|
-| note holding the answer reached the model | 11/24 (46%) | **23/24 (96%)** |
+| note holding the answer reached the model | 11/24 (46%) | **24/24 (100%)** |
 
-Twelve questions rescued, no control lost, and the expansion cost 2.3 notes and 424 characters
-a question against a ceiling of 2,400. The graph is doing what slice 6 claimed.
+Thirteen questions rescued, no control lost, and the expansion costs 2.3 notes and 418
+characters a question against a ceiling of 2,400.
 
-**One real defect, and the eval is how we know.** `who-insures-the-volvo` is the single miss.
-Its top seed is `car/estate.md`, which links *directly* to the note that holds the answer —
-and the expansion dropped it. Every candidate ties at one connection, so the tiebreak decides,
-and the tiebreak is alphabetical (chosen in slice 6 for determinism): `compost` and
-`energy-tariff`, reached from junk seeds ranked 3rd and 4th, take the slots ahead of
-`motor-policy`, reached from the seed ranked 1st.
+**It got there by finding a real defect, which is the best argument for keeping it.** On the
+first run this said 23/24, and the miss was `who-insures-the-volvo` — whose top seed,
+`car/estate.md`, links *directly* to the note holding the answer. The expansion had dropped it.
+Every candidate tied at one connection, so the tiebreak decided, and the tiebreak was
+alphabetical: `compost` and `energy-tariff`, reached from junk seeds ranked 3rd and 4th, took
+the slots ahead of `motor-policy`, reached from the seed ranked 1st. **The expansion was
+throwing away BM25's ranking of its own seeds.**
 
-**The expansion throws away BM25's ranking of its own seeds.** A note linked from the best hit
-should outrank one linked from the worst. The fix is to carry each seed's rank into
-`related_notes` and sort by it before falling back to the slug — a change to ranking, not to
-traversal, and its own slice.
+The fix carried each seed's rank into `related_notes` and sorted ties by the best seed that
+reached a note, before falling back to the slug. Same traversal, same caps, same flags, and
+practically the same context budget — the expansion simply spends it on better notes now.
+
+Two lessons worth keeping. A **threshold assertion hides a defect**: the corpus test asserted
+"at least 11 of 13 rescued" and stayed green straight through this. It now names every question
+the graph fails to reach, and would have failed on the 12th. And an eval whose numbers only ever
+go up is not measuring anything — the run that costs you something is the one doing its job.

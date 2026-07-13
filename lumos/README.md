@@ -188,7 +188,7 @@ This is the one thing a keyword search cannot do: reach a note that never repeat
 
 - **Only `links_to` is followed**, forwards or backwards. Notes that merely share a tag, or share an unresolved mention, sit two hops apart through a hub of unbounded degree — one popular tag would drag your whole notes folder into the context.
 - **Linked notes never displace search hits.** They are appended after them, because being linked to an answer is weaker evidence than being one.
-- **They are ranked** by how many of the seeds reach each one: a note two hits both link to beats one a single hit mentions in passing. Ties break on slug, so the same question builds the same prompt twice running.
+- **They are ranked** by how many of the seeds reach each one — a note two hits both link to beats one a single hit mentions in passing — and then by the best-ranked hit that reached it, so a note the top hit links to outranks one the last hit merely mentions. Search order is the only relevance signal the graph has, and it decides the cap. The slug settles nothing but a true tie, and only so that the same question builds the same prompt twice running.
 - **The caps are hard.** `LUMOS_GRAPH_EXPAND_MAX_NOTES` (default 3) and `LUMOS_GRAPH_EXPAND_MAX_CHARS` (default 800, the note's opening) bound the growth: at most 2,400 extra characters, no matter how densely linked your notes are.
 - **Linked notes are context, not citations.** They do not appear in an answer's sources, because the search never matched them and a citation card would present them as grounds for an answer they may need not have touched. The model is told to name any note it does rely on, so a linked note reaches you in the answer rather than beside it.
 

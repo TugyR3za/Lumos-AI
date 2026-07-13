@@ -32,11 +32,12 @@ def test_every_question_tests_what_it_claims(results: list[Retrieval]):
 
 def test_the_graph_reaches_what_bm25_cannot(results: list[Retrieval]):
     link_only = [r for r in results if r.question.kind == "linked"]
-    rescued = [r for r in link_only if r.rescued]
 
-    # 12 of 13 today. The hold-out is who-insures-the-volvo, which loses its slot
-    # under the cap to notes linked from weaker seeds — see evals/README.md.
-    assert len(rescued) >= 11, [r.question.id for r in link_only if not r.rescued]
+    # All 13 of them: every question whose answer BM25 cannot reach, the graph can.
+    # This asserted 11 while the expansion broke its ties alphabetically and dropped
+    # a note its own top seed pointed at, which is what a threshold buys you — the
+    # suite stayed green through the defect. It names its failures now.
+    assert [r.question.id for r in link_only if not r.rescued] == []
 
 
 def test_the_notes_search_already_found_are_never_lost(results: list[Retrieval]):
