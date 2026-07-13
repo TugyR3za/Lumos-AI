@@ -1,4 +1,4 @@
-.PHONY: install run cli reindex test lint format
+.PHONY: install run cli reindex test lint format eval eval-answers
 
 install:
 	python -m pip install -e ".[dev]"
@@ -20,3 +20,9 @@ lint:
 
 format:
 	ruff format .
+
+eval:
+	python -m evals.run_eval
+
+eval-answers:
+	python -m evals.run_eval --answers

@@ -245,6 +245,14 @@ See:
 - `docs/extending.md`
 - `docs/security.md`
 
+## Evaluating the graph
+
+`make eval` asks whether graph expansion actually helps: 24 questions over a 32-note corpus,
+comparing what reaches the model with expansion off and on. It needs no model and takes a
+second. `make eval-answers` also asks the configured model each question twice, to see whether
+the answer itself improved. See [evals/README.md](evals/README.md) for what it measures — and
+what it cannot.
+
 ## v0.1 boundaries
 
 Not included yet:
