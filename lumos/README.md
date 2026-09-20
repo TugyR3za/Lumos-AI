@@ -90,6 +90,8 @@ server, the lowest-RAM way to use Lumos. Slash commands:
 | `/reset` | start a new conversation |
 | `/quit` | exit |
 
+Under each reply the CLI prints a dim line per tool that ran — `tool: search_notes ✓`, or `✗` and the error if it failed — so you can see what Lumos did. Names and errors only: arguments and results are never echoed.
+
 `python -m lumos reindex` rebuilds the notes index and exits.
 
 ## Providers

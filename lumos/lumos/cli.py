@@ -222,6 +222,16 @@ def _print_response(console: Console, response: ChatResponse) -> None:
     console.print(Text(f"({response.provider} · {response.model})", style="dim"))
     for index, source in enumerate(response.sources[:4], start=1):
         console.print(Text(f"  [{index}] {source.title} — {source.location}", style="dim"))
+    # Which tools ran, and whether each one worked. Names and errors only: a
+    # call's arguments and its result carry note text, web pages, or a memory,
+    # and a one-line receipt is not the place to repeat any of them.
+    for event in response.tool_events:
+        name = str(event.get("tool") or "unknown")
+        if event.get("ok"):
+            console.print(Text(f"  tool: {name} ✓", style="dim"))
+            continue
+        error = str(event.get("error") or "unknown error")
+        console.print(Text(f"  tool: {name} ✗ — {error}", style="dim"))
 
 
 def run() -> None:

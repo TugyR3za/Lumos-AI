@@ -6,9 +6,17 @@ import pytest
 from rich.console import Console
 from rich.table import Table
 
-from lumos.cli import QUIT, CliState, chat_once, handle_command, status_summary
+from lumos.cli import (
+    QUIT,
+    CliState,
+    _print_response,
+    chat_once,
+    handle_command,
+    status_summary,
+)
 from lumos.config import Settings
 from lumos.core.container import LumosContainer, build_container
+from lumos.schemas import ChatResponse, SourceItem
 
 
 def build(tmp_path: Path, *, graph_enabled: bool = False) -> LumosContainer:
@@ -171,3 +179,75 @@ async def test_status_reports_the_graph(tmp_path: Path):
 
     off = render(await handle_command(build(tmp_path), CliState(), "status", ""))
     assert "disabled · 3 nodes · 2 edges" in off  # counts stay honest when reads are off
+
+
+def print_response(response: ChatResponse) -> str:
+    """A whole reply as the terminal would show it, tool lines included."""
+    stream = io.StringIO()
+    _print_response(Console(width=100, file=stream), response)
+    return stream.getvalue()
+
+
+def reply(
+    tool_events: list[dict[str, Any]],
+    sources: list[SourceItem] | None = None,
+) -> ChatResponse:
+    return ChatResponse(
+        conversation_id="conversation-1",
+        answer="Answered.",
+        provider="echo",
+        model="echo-model",
+        sources=sources or [],
+        tool_events=tool_events,
+    )
+
+
+def test_a_successful_tool_is_named_after_the_sources():
+    out = print_response(
+        reply(
+            [
+                {
+                    "tool": "search_notes",
+                    "arguments": {"query": "pizza night"},
+                    "ok": True,
+                    "result": [{"path": "food/friday.md", "content": "Deep dish, 7pm"}],
+                }
+            ],
+            sources=[
+                SourceItem(
+                    kind="note",
+                    title="Friday",
+                    location="food/friday.md",
+                    snippet="Deep dish, 7pm",
+                )
+            ],
+        )
+    )
+
+    assert "tool: search_notes ✓" in out
+    assert out.index("[1] Friday — food/friday.md") < out.index("tool: search_notes")
+    # A receipt, not a transcript: neither the query asked nor the note found.
+    assert "pizza night" not in out and "Deep dish" not in out
+
+
+def test_a_failed_tool_is_named_with_its_error():
+    out = print_response(
+        reply(
+            [
+                {
+                    "tool": "search_web",
+                    "arguments": {"query": "anything"},
+                    "ok": False,
+                    "error": "Tool 'search_web' is not permitted for this request.",
+                }
+            ]
+        )
+    )
+
+    failure = "tool: search_web ✗ — Tool 'search_web' is not permitted for this request."
+    assert failure in out
+    assert "anything" not in out
+
+
+def test_a_reply_with_no_tool_events_says_nothing_about_tools():
+    assert "tool:" not in print_response(reply([]))
