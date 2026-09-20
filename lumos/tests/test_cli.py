@@ -81,10 +81,12 @@ async def test_command_dispatch(container: LumosContainer):
     await handle_command(container, state, "model", "bogus")
     assert state.route == "local"  # invalid input leaves the route unchanged
 
-    await handle_command(container, state, "web", "on")
+    out = await handle_command(container, state, "web", "on")
     assert state.use_web is True
-    await handle_command(container, state, "notes", "off")
+    assert out == "web permission: on"
+    out = await handle_command(container, state, "notes", "off")
     assert state.use_notes is False
+    assert out == "notes permission: off"
 
     state.conversation_id = "abc"
     await handle_command(container, state, "reset", "")

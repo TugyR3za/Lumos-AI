@@ -8,6 +8,8 @@ Lumos v0.1 is a development build for localhost use.
 - Does not expose API keys to the browser.
 - Does not include arbitrary shell or computer-control tools.
 - Uses an explicit tool allowlist.
+- Narrows that allowlist per request: disabled notes/web permissions hide and reject
+  `search_notes`/`search_web` calls before their handlers run.
 - Bounds tool-call rounds to prevent endless loops.
 - Restricts notes ingestion to one configured folder.
 - Skips hidden, unsupported, and oversized files.

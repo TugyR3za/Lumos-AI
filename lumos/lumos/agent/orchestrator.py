@@ -56,6 +56,13 @@ class AgentOrchestrator:
         use_notes: bool,
         use_web: bool,
     ) -> ChatResponse:
+        permitted_tool_names = set(self.tools.names())
+        if not use_notes:
+            permitted_tool_names.discard("search_notes")
+        if not use_web:
+            permitted_tool_names.discard("search_web")
+        permitted_tool_schemas = self.tools.schemas(permitted_tool_names)
+
         conversation_id = await asyncio.to_thread(
             self.database.create_conversation, conversation_id
         )
@@ -125,7 +132,7 @@ class AgentOrchestrator:
         for _ in range(self.max_tool_rounds):
             candidate = await self.providers.chat(
                 messages=messages,
-                tools=self.tools.schemas(),
+                tools=permitted_tool_schemas,
                 route=route,
             )
             if not candidate.tool_calls:
@@ -146,7 +153,11 @@ class AgentOrchestrator:
             for call in candidate.tool_calls:
                 event: dict[str, object]
                 try:
-                    result = await self.tools.execute(call.name, call.arguments)
+                    result = await self.tools.execute(
+                        call.name,
+                        call.arguments,
+                        permitted_names=permitted_tool_names,
+                    )
                     event = {
                         "tool": call.name,
                         "arguments": call.arguments,

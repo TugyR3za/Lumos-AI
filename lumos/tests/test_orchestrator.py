@@ -41,20 +41,70 @@ class ToolHungryProvider:
 
 
 class CapturingProvider:
-    """Answers plainly and records every message list it was sent."""
+    """Answers plainly and records the messages and tool schemas it was sent."""
 
     name = "capture"
     model = "capture-model"
 
     def __init__(self):
         self.seen_messages: list[list[dict]] = []
+        self.seen_tools: list[list[dict] | None] = []
 
     async def check(self) -> ProviderCheck:
         return ProviderCheck("available")
 
     async def chat(self, messages, tools=None):
         self.seen_messages.append([dict(m) for m in messages])
+        self.seen_tools.append(tools)
         return ProviderResponse("ok", self.name, self.model)
+
+
+class SingleToolProvider:
+    """Requests one named tool, then returns a normal answer."""
+
+    name = "single-tool"
+    model = "single-tool-model"
+
+    def __init__(self, tool_name: str):
+        self.tool_name = tool_name
+        self.requested = False
+        self.seen_tools: list[list[dict] | None] = []
+
+    async def check(self) -> ProviderCheck:
+        return ProviderCheck("available")
+
+    async def chat(self, messages, tools=None):
+        self.seen_tools.append(tools)
+        if not self.requested:
+            self.requested = True
+            return ProviderResponse(
+                content="",
+                provider=self.name,
+                model=self.model,
+                tool_calls=[
+                    ToolCall(
+                        id="call-1",
+                        name=self.tool_name,
+                        arguments={"query": "privacy check"},
+                    )
+                ],
+            )
+        return ProviderResponse("answer without another tool", self.name, self.model)
+
+
+def advertised_tool_names(tools: list[dict] | None) -> set[str]:
+    return {schema["function"]["name"] for schema in tools or []}
+
+
+def register_test_tool(agent: AgentOrchestrator, name: str, handler) -> None:
+    agent.tools.register(
+        RegisteredTool(
+            name=name,
+            description=f"Test {name} tool",
+            parameters={"type": "object", "properties": {}},
+            handler=handler,
+        )
+    )
 
 
 def make_agent(
@@ -132,6 +182,147 @@ async def test_normal_turn_unaffected_by_exhaustion_handling(tmp_path: Path):
     assert response.answer == "ok"
     assert len(provider.seen_messages) == 1  # answered on the first call
     assert response.tool_events == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("use_notes", "use_web", "expected"),
+    [
+        (False, False, {"ping", "save_memory"}),
+        (True, False, {"ping", "save_memory", "search_notes"}),
+        (False, True, {"ping", "save_memory", "search_web"}),
+        (True, True, {"ping", "save_memory", "search_notes", "search_web"}),
+    ],
+)
+async def test_tool_schemas_follow_request_permissions(
+    tmp_path: Path,
+    use_notes: bool,
+    use_web: bool,
+    expected: set[str],
+):
+    provider = CapturingProvider()
+    _, agent = make_agent(tmp_path, provider)
+    for name in ("search_notes", "search_web", "save_memory"):
+        register_test_tool(agent, name, lambda: None)
+
+    await agent.chat(
+        user_message="hello",
+        conversation_id=None,
+        route="auto",
+        use_notes=use_notes,
+        use_web=use_web,
+    )
+
+    assert advertised_tool_names(provider.seen_tools[0]) == expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("tool_name", "use_notes", "use_web"),
+    [
+        ("search_notes", False, True),
+        ("search_web", True, False),
+    ],
+)
+async def test_fabricated_disabled_tool_call_is_rejected_before_execution(
+    tmp_path: Path,
+    tool_name: str,
+    use_notes: bool,
+    use_web: bool,
+):
+    provider = SingleToolProvider(tool_name)
+    _, agent = make_agent(tmp_path, provider)
+    handler_calls: list[str] = []
+
+    def handler(query: str):
+        handler_calls.append(query)
+        return {"should_not": "run"}
+
+    register_test_tool(agent, tool_name, handler)
+
+    response = await agent.chat(
+        user_message="hello",
+        conversation_id=None,
+        route="auto",
+        use_notes=use_notes,
+        use_web=use_web,
+    )
+
+    error = f"Tool '{tool_name}' is not permitted for this request."
+    assert tool_name not in advertised_tool_names(provider.seen_tools[0])
+    assert handler_calls == []
+    assert response.answer == "answer without another tool"
+    assert response.tool_events == [
+        {
+            "tool": tool_name,
+            "arguments": {"query": "privacy check"},
+            "ok": False,
+            "error": error,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("tool_name", "use_notes", "use_web"),
+    [
+        ("search_notes", True, False),
+        ("search_web", False, True),
+    ],
+)
+async def test_permitted_note_and_web_tool_calls_still_execute(
+    tmp_path: Path,
+    tool_name: str,
+    use_notes: bool,
+    use_web: bool,
+):
+    provider = SingleToolProvider(tool_name)
+    _, agent = make_agent(tmp_path, provider)
+    handler_calls: list[str] = []
+
+    def handler(query: str):
+        handler_calls.append(query)
+        return {"query": query}
+
+    register_test_tool(agent, tool_name, handler)
+
+    response = await agent.chat(
+        user_message="hello",
+        conversation_id=None,
+        route="auto",
+        use_notes=use_notes,
+        use_web=use_web,
+    )
+
+    assert tool_name in advertised_tool_names(provider.seen_tools[0])
+    assert handler_calls == ["privacy check"]
+    assert response.tool_events[0]["ok"] is True
+    assert response.tool_events[0]["result"] == {"query": "privacy check"}
+
+
+@pytest.mark.asyncio
+async def test_save_memory_tool_is_unaffected_by_retrieval_permissions(tmp_path: Path):
+    provider = SingleToolProvider("save_memory")
+    _, agent = make_agent(tmp_path, provider)
+    handler_calls: list[str] = []
+
+    def handler(query: str):
+        handler_calls.append(query)
+        return {"saved": True}
+
+    register_test_tool(agent, "save_memory", handler)
+
+    response = await agent.chat(
+        user_message="remember this",
+        conversation_id=None,
+        route="auto",
+        use_notes=False,
+        use_web=False,
+    )
+
+    assert "save_memory" in advertised_tool_names(provider.seen_tools[0])
+    assert handler_calls == ["privacy check"]
+    assert response.tool_events[0]["ok"] is True
 
 
 @pytest.mark.asyncio

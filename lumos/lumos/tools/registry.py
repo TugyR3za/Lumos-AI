@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Collection
 from dataclasses import dataclass
 from typing import Any
 
@@ -37,13 +37,25 @@ class ToolRegistry:
             raise ValueError(f"Tool already registered: {tool.name}")
         self._tools[tool.name] = tool
 
-    def schemas(self) -> list[dict[str, Any]]:
-        return [tool.schema() for tool in self._tools.values()]
+    def schemas(self, permitted_names: Collection[str] | None = None) -> list[dict[str, Any]]:
+        return [
+            tool.schema()
+            for tool in self._tools.values()
+            if permitted_names is None or tool.name in permitted_names
+        ]
 
-    async def execute(self, name: str, arguments: dict[str, Any]) -> Any:
+    async def execute(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        *,
+        permitted_names: Collection[str] | None = None,
+    ) -> Any:
         tool = self._tools.get(name)
         if not tool:
             raise KeyError(f"Unknown or disallowed tool: {name}")
+        if permitted_names is not None and name not in permitted_names:
+            raise PermissionError(f"Tool '{name}' is not permitted for this request.")
         result = tool.handler(**arguments)
         if inspect.isawaitable(result):
             return await result

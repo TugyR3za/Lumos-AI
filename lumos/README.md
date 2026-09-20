@@ -86,7 +86,7 @@ server, the lowest-RAM way to use Lumos. Slash commands:
 | `/graph <note>` | links, tags, and related notes for a note path or slug |
 | `/remember <text>` | save a durable personal memory |
 | `/model auto\|local\|cloud` | provider route for this session |
-| `/notes on\|off`, `/web on\|off` | toggle notes / web context |
+| `/notes on\|off`, `/web on\|off` | allow or deny notes / web retrieval for this session |
 | `/reset` | start a new conversation |
 | `/quit` | exit |
 
@@ -229,6 +229,14 @@ Current tools:
 - `search_notes`
 - `search_web`
 - Optional `save_memory` when `LUMOS_ALLOW_MODEL_MEMORY_WRITES=true`
+
+The CLI notes and web switches are session-level permissions applied to every
+chat request. `/notes off` prevents both proactive note retrieval and model
+calls to `search_notes`; `/web off` likewise prevents proactive web retrieval
+and model calls to `search_web`. The provider is not shown disabled tool schemas,
+and fabricated calls to a disabled tool are rejected before its handler runs.
+These switches do not enable tools that are absent from the global allowlist or
+change the separate configuration controlling `save_memory`.
 
 Durable model-written memory is disabled by default until Lumos has an approval and review interface. Memories you save yourself (CLI `/remember`) are searched with FTS5 every turn, and the ones that bear on your question are injected into the model's context. Conversation history is always stored locally in SQLite.
 

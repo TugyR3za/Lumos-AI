@@ -39,8 +39,8 @@ Commands:
   /graph <note>       links, tags, and related notes for a note path or slug
   /remember <text>    save a durable personal memory
   /model <route>      auto | local (primary: Ollama) | cloud (fallback: OpenRouter)
-  /notes on|off       include local notes context (default on)
-  /web on|off         include web search context (default off)
+  /notes on|off       permit note retrieval and search_notes (default on)
+  /web on|off         permit web retrieval and search_web (default off)
   /reset              start a new conversation
   /quit               exit
 Anything else is sent to Lumos."""
@@ -196,7 +196,7 @@ async def handle_command(
             state.use_notes = enabled
         else:
             state.use_web = enabled
-        return f"{command} context: {argument}"
+        return f"{command} permission: {argument}"
     if command == "reset":
         state.conversation_id = None
         return "Started a new conversation."
