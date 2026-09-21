@@ -13,6 +13,21 @@ from lumos.graph import store as graph_store
 from lumos.graph.extract import NoteRefs
 from lumos.retrieval.relevance import above_floor, search_terms
 
+# What a memory tells its owner about itself. Spelled out rather than SELECT *, so
+# a column added to `memories` later has to be added here on purpose — once, here —
+# instead of arriving unannounced in a listing and in every export.
+MEMORY_FIELDS = (
+    "id",
+    "namespace",
+    "memory_key",
+    "value",
+    "importance",
+    "source",
+    "created_at",
+    "updated_at",
+)
+_MEMORY_COLUMNS = ", ".join(MEMORY_FIELDS)
+
 
 class Database:
     """Small SQLite persistence layer with one connection per operation."""
@@ -471,3 +486,66 @@ class Database:
         # which branch ran. The magnitude means one thing in both: how good the match is.
         results = [dict(row) | {"score": abs(float(row["rank"]))} for row in rows]
         return above_floor(results, score_floor)
+
+    def list_memories(self, *, limit: int | None = 20, offset: int = 0) -> list[dict[str, Any]]:
+        """Saved memories, newest first, across every namespace.
+
+        Listing is not searching, and this is not ``search_memories`` with the
+        query taken out. That method answers "what bears on this question?" and is
+        built to leave most memories out; this one answers "what have I saved?",
+        where leaving one out is the bug. It takes no namespace either: a namespace
+        is how recall is scoped, not somewhere a memory can hide from its owner.
+
+        ``limit=None`` hands back all of them, which is what an export wants.
+        """
+        with self.connect() as db:
+            rows = db.execute(
+                f"""
+                SELECT {_MEMORY_COLUMNS}
+                FROM memories
+                ORDER BY updated_at DESC, id DESC
+                LIMIT ? OFFSET ?
+                """,
+                # SQLite reads a negative LIMIT as no limit, which is how OFFSET
+                # stays usable when the caller wants everything.
+                (-1 if limit is None else limit, offset),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def count_memories(self) -> int:
+        """How many memories are saved, across every namespace."""
+        with self.connect() as db:
+            return int(db.execute("SELECT COUNT(*) FROM memories").fetchone()[0])
+
+    def get_memory(self, memory_id: int) -> dict[str, Any] | None:
+        """One memory by id, or None if there is no such memory."""
+        with self.connect() as db:
+            row = db.execute(
+                f"SELECT {_MEMORY_COLUMNS} FROM memories WHERE id = ?",
+                (memory_id,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def delete_memory(self, memory_id: int) -> bool:
+        """Delete one memory — and the copy of its text in the search index.
+
+        ``memories_fts`` is not a cache that can be left to go stale. It holds a
+        second copy of the sentence, and nothing in this schema keeps the two in
+        step: there are no triggers, and ``save_memory`` writes both rows by hand,
+        so a delete has to as well. Dropping only the ``memories`` row would take
+        the memory out of every listing and out of recall — the search joins
+        through it — while leaving the text itself sitting in the database file.
+        Someone who asks Lumos to forget where the spare key is means the sentence,
+        not the row. (``replace_document`` clears ``chunks_fts`` for the same
+        reason.)
+
+        Both deletes share one ``connect()`` block, so they share one transaction
+        and one commit: there is no window in which a crash leaves the text indexed
+        under a memory that no longer exists. Returns True only if a memory row
+        actually went, so a caller can never report a deletion that did not happen.
+        """
+        with self.connect() as db:
+            if self.fts5_enabled:
+                db.execute("DELETE FROM memories_fts WHERE memory_id = ?", (memory_id,))
+            deleted = db.execute("DELETE FROM memories WHERE id = ?", (memory_id,)).rowcount
+        return deleted == 1

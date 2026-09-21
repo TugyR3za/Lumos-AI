@@ -9,6 +9,7 @@ from rich.table import Table
 from lumos.cli import (
     QUIT,
     CliState,
+    _memory_preview,
     _print_response,
     chat_once,
     handle_command,
@@ -25,6 +26,9 @@ def build(tmp_path: Path, *, graph_enabled: bool = False) -> LumosContainer:
         _env_file=None,
         database_path=tmp_path / "lumos.db",
         notes_path=tmp_path / "notes",
+        # Without this an export in a test writes into the real data/ folder: the
+        # database is redirected here, the export path would not have been.
+        memory_export_path=tmp_path / "exports",
         ollama_enabled=False,
         cloud_enabled=False,
         web_search_provider="disabled",
@@ -251,3 +255,286 @@ def test_a_failed_tool_is_named_with_its_error():
 
 def test_a_reply_with_no_tool_events_says_nothing_about_tools():
     assert "tool:" not in print_response(reply([]))
+
+
+# --- memory management: /memories, /memory show|delete|export ------------------
+
+
+def saved(container: LumosContainer, *values: str) -> list[int]:
+    return [container.database.save_memory(value, source="user_cli") for value in values]
+
+
+@pytest.mark.asyncio
+async def test_memories_lists_what_is_saved(container: LumosContainer):
+    ids = saved(
+        container,
+        "Pizza night is Friday",
+        "The cat is called Biscuit",
+    )
+
+    out = render(await handle_command(container, CliState(), "memories", ""))
+
+    assert "Saved memories (2)" in out
+    for memory_id in ids:
+        assert str(memory_id) in out
+    assert "Pizza night is Friday" in out
+    assert "The cat is called Biscuit" in out
+    assert "user_cli" in out
+    assert "/memory show <id> for one in full" in out
+
+
+@pytest.mark.asyncio
+async def test_memories_says_so_when_there_are_none(container: LumosContainer):
+    out = await handle_command(container, CliState(), "memories", "")
+
+    assert out == "No memories saved yet. Use /remember <text> to save one."
+
+
+@pytest.mark.asyncio
+async def test_the_listing_is_bounded_by_default(container: LumosContainer):
+    saved(container, *(f"memory {index:02d}" for index in range(1, 26)))
+
+    out = render(await handle_command(container, CliState(), "memories", ""))
+
+    assert "Saved memories (20 of 25)" in out
+    # One row per memory, and the source column is on every one of them.
+    assert len([line for line in out.splitlines() if "user_cli" in line]) == 20
+    assert "memory 25" in out  # newest first
+    assert "memory 06" in out
+    assert "memory 05" not in out  # …and the oldest five are over the limit
+
+
+@pytest.mark.asyncio
+async def test_the_limit_can_be_raised_within_reason(container: LumosContainer):
+    saved(container, *(f"memory {index:02d}" for index in range(1, 26)))
+
+    out = render(await handle_command(container, CliState(), "memories", "25"))
+
+    assert "Saved memories (25)" in out
+    assert "memory 01" in out
+
+
+@pytest.mark.asyncio
+async def test_a_bad_limit_is_rejected(container: LumosContainer):
+    saved(container, "Pizza night is Friday")
+    usage = "Usage: /memories [limit]  (1-200, default 20)."
+
+    for argument in ("abc", "0", "201", "-1", "1.5", "20 please"):
+        assert await handle_command(container, CliState(), "memories", argument) == usage
+
+
+@pytest.mark.asyncio
+async def test_a_long_memory_is_previewed_not_printed(container: LumosContainer):
+    long_memory = "The vet is on Mill Road " + ("and it goes on and on " * 80) + "ENDMARKER"
+    saved(container, long_memory)
+
+    out = render(await handle_command(container, CliState(), "memories", ""))
+
+    assert "The vet is on Mill Road" in out
+    assert "ENDMARKER" not in out  # the far end of the memory never reaches the screen
+    assert out.count("and it goes on and on") <= 2  # 60 characters does not hold a third
+    assert len(out) < len(long_memory) // 2  # table furniture included
+    # The bound lives in the data, not in however wide the terminal happens to be.
+    assert len(_memory_preview(long_memory)) <= 60
+
+
+@pytest.mark.asyncio
+async def test_a_squeezed_listing_gives_up_preview_and_nothing_else(container: LumosContainer):
+    """Regression: every column shrank together, so `user_cli` came out `user_c…`.
+
+    When the table is wider than the terminal, rich takes the difference out of
+    whichever columns it may. The preview is the only one that can afford it — it
+    is an abridgement already — while a date cut to `2026-09-2…` says neither
+    the date nor the time, and a truncated id cannot be typed into /memory show.
+    """
+    memory_id = container.database.save_memory(
+        "The boiler is serviced by Kavanagh every fourteen months, booked by telephone",
+        memory_key="boiler",
+        source="user_cli",
+    )
+    saved_row = container.database.get_memory(memory_id)
+
+    out = render(await handle_command(container, CliState(), "memories", ""))
+
+    row = next(line for line in out.splitlines() if "user_cli" in line)
+    assert str(memory_id) in row
+    assert "boiler" in row  # not "boil…"
+    assert str(saved_row["updated_at"])[:10] in row  # the whole date
+    assert "0.50" in row
+
+
+@pytest.mark.asyncio
+async def test_a_memory_full_of_newlines_stays_on_one_line(container: LumosContainer):
+    saved(container, "Gas meter reading\n\n  0421\tunder the stairs")
+
+    out = render(await handle_command(container, CliState(), "memories", ""))
+
+    assert "Gas meter reading 0421 under the stairs" in out
+
+
+@pytest.mark.asyncio
+async def test_markup_in_a_memory_is_shown_not_obeyed(container: LumosContainer):
+    memory_id = saved(container, "Pay [bold]£40[/bold] weekly")[0]
+
+    listed = render(await handle_command(container, CliState(), "memories", ""))
+    shown = render(await handle_command(container, CliState(), "memory", f"show {memory_id}"))
+
+    assert "Pay [bold]£40[/bold] weekly" in listed
+    assert "Pay [bold]£40[/bold] weekly" in shown
+
+
+@pytest.mark.asyncio
+async def test_memory_show_prints_one_memory_in_full(container: LumosContainer):
+    memory_id = container.database.save_memory(
+        "Reza is allergic to penicillin",
+        memory_key="allergy",
+        importance=0.8,
+        source="user_cli",
+    )
+
+    out = render(await handle_command(container, CliState(), "memory", f"show {memory_id}"))
+
+    assert f"memory #{memory_id}" in out
+    assert "Reza is allergic to penicillin" in out
+    assert "allergy" in out
+    assert "0.80" in out
+    assert "user_cli" in out
+    assert "personal" in out
+    assert out.count("2") >= 1  # the created and updated stamps are both rendered
+    assert "created" in out and "updated" in out
+
+
+@pytest.mark.asyncio
+async def test_memory_show_handles_bad_and_unknown_ids(container: LumosContainer):
+    usage = "Usage: /memory show <id> — ids are numbers, see /memories"
+
+    assert await handle_command(container, CliState(), "memory", "show abc") == usage
+    assert await handle_command(container, CliState(), "memory", "show") == usage
+    assert await handle_command(container, CliState(), "memory", "show -3") == usage
+    assert await handle_command(container, CliState(), "memory", "show 999") == "No memory #999."
+
+
+@pytest.mark.asyncio
+async def test_an_unknown_memory_subcommand_shows_usage(container: LumosContainer):
+    usage = "Usage: /memory show <id> | /memory delete <id> | /memory export"
+
+    assert await handle_command(container, CliState(), "memory", "") == usage
+    assert await handle_command(container, CliState(), "memory", "forget everything") == usage
+
+
+@pytest.mark.asyncio
+async def test_delete_removes_the_memory_once_it_is_confirmed(container: LumosContainer):
+    memory_id = saved(container, "The wifi password is SALTMARSH-42")[0]
+    asked: list[str] = []
+
+    def confirm(prompt: str) -> str:
+        asked.append(prompt)
+        return "yes"
+
+    out = await handle_command(
+        container, CliState(), "memory", f"delete {memory_id}", confirm=confirm
+    )
+
+    assert out == f"Deleted memory #{memory_id}."
+    assert container.database.get_memory(memory_id) is None
+    assert container.database.search_memories("wifi password") == []
+    # The prompt showed what was about to go, and said what a yes means.
+    assert "SALTMARSH-42" in asked[0]
+    assert "Delete this memory permanently? Type yes to confirm: " in asked[0]
+
+
+@pytest.mark.asyncio
+async def test_a_cancelled_delete_changes_nothing(container: LumosContainer):
+    memory_id = saved(container, "The wifi password is SALTMARSH-42")[0]
+
+    for answer in ("y", "Y", "no", "", "yes please", "ye", None):
+        out = await handle_command(
+            container,
+            CliState(),
+            "memory",
+            f"delete {memory_id}",
+            confirm=lambda _prompt, reply=answer: reply,
+        )
+
+        assert out == "Cancelled. Nothing was deleted."
+        assert container.database.get_memory(memory_id) is not None
+        # Still in the search index too, not merely still in the table.
+        assert container.database.search_memories("wifi password") != []
+
+
+@pytest.mark.asyncio
+async def test_only_an_exact_yes_deletes(container: LumosContainer):
+    for answer in ("yes", "YES", "  yes  ", "Yes"):
+        memory_id = saved(container, "The wifi password is SALTMARSH-42")[0]
+
+        out = await handle_command(
+            container,
+            CliState(),
+            "memory",
+            f"delete {memory_id}",
+            confirm=lambda _prompt, reply=answer: reply,
+        )
+
+        assert out == f"Deleted memory #{memory_id}."
+        assert container.database.get_memory(memory_id) is None
+
+
+@pytest.mark.asyncio
+async def test_delete_refuses_when_there_is_nobody_to_ask(container: LumosContainer):
+    # No confirmation callback is what a non-interactive caller looks like, and
+    # deleting is irreversible: no person, no consent, no delete.
+    memory_id = saved(container, "The spare key is at number 14")[0]
+
+    out = await handle_command(container, CliState(), "memory", f"delete {memory_id}")
+
+    assert out == "Delete needs an interactive terminal; nothing was deleted."
+    assert container.database.get_memory(memory_id) is not None
+
+
+@pytest.mark.asyncio
+async def test_deleting_an_unknown_id_never_asks(container: LumosContainer):
+    def confirm(prompt: str) -> str:
+        raise AssertionError("asked to confirm a memory that does not exist")
+
+    out = await handle_command(
+        container, CliState(), "memory", "delete 999", confirm=confirm
+    )
+
+    assert out == "No memory #999."
+
+
+@pytest.mark.asyncio
+async def test_delete_handles_a_non_numeric_id(container: LumosContainer):
+    usage = "Usage: /memory delete <id> — ids are numbers, see /memories"
+
+    assert await handle_command(container, CliState(), "memory", "delete all") == usage
+    assert await handle_command(container, CliState(), "memory", "delete") == usage
+
+
+@pytest.mark.asyncio
+async def test_managing_memories_is_never_part_of_the_conversation(container: LumosContainer):
+    """Looking at your memories does not put them in front of a provider.
+
+    These commands return renderables straight to the terminal: nothing they
+    print is written to `messages`, so nothing they print can come back as
+    history on the next turn.
+    """
+    memory_id = saved(container, "The wifi password is SALTMARSH-42")[0]
+    state = CliState()
+
+    await handle_command(container, state, "memories", "")
+    await handle_command(container, state, "memory", f"show {memory_id}")
+    await handle_command(container, state, "memory", "export")
+
+    assert container.database.stats()["messages"] == 0
+    assert state.conversation_id is None
+
+
+@pytest.mark.asyncio
+async def test_help_lists_the_memory_commands(container: LumosContainer):
+    out = str(await handle_command(container, CliState(), "help", ""))
+
+    assert "/memories" in out
+    assert "/memory show" in out
+    assert "/memory delete" in out
+    assert "/memory export" in out

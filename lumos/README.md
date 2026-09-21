@@ -85,6 +85,10 @@ server, the lowest-RAM way to use Lumos. Slash commands:
 | `/reindex` | rescan the notes folder |
 | `/graph <note>` | links, tags, and related notes for a note path or slug |
 | `/remember <text>` | save a durable personal memory |
+| `/memories [limit]` | list saved memories, newest first (1–200, default 20) |
+| `/memory show <id>` | one saved memory in full |
+| `/memory delete <id>` | delete one saved memory, after confirming |
+| `/memory export` | write every saved memory to a JSON file |
 | `/model auto\|local\|cloud` | provider route for this session |
 | `/notes on\|off`, `/web on\|off` | allow or deny notes / web retrieval for this session |
 | `/reset` | start a new conversation |
@@ -249,6 +253,28 @@ LUMOS_MEMORY_SCORE_FLOOR=0.50
 ```
 
 A junk note is a card nobody reads. A junk memory is a private fact about your family — an allergy, a mortgage, where the spare key is — sent to whichever provider answers a question that had nothing to do with it. So the bar to *send* a memory is higher than the bar to *show* a note, and a question made only of function words ("how are you?") recalls nothing at all rather than being taken literally. On a twenty-memory set this took what gets recalled from 3.3 memories a question, two thirds of them unasked for, down to 1.1 — without losing a single memory that was.
+
+### Managing what Lumos remembers
+
+`/memories` lists what is saved, newest first, as a short preview per line rather
+than the full text — enough to recognise a memory, not enough to put all of them
+on screen at once. `/memory show <id>` prints one in full.
+
+`/memory delete <id>` shows you the memory and then asks, and only an exact `yes`
+goes through; anything else, including Ctrl-C, cancels and changes nothing. The
+delete removes the memory from the search index as well as the table, so the text
+itself leaves the database rather than merely stopping being listed.
+
+`/memory export` writes every memory to `data/exports/lumos-memories-<UTC>.json`
+(`LUMOS_MEMORY_EXPORT_PATH`), stamped with an export time and a format version, and
+carrying each memory's id, namespace, key, value, importance, source, and created
+and updated times. Filenames are timestamped and an export never overwrites an
+earlier one. The file holds memories and nothing else — no conversations, no notes,
+no tool logs, no API keys — but it is **plaintext and unencrypted**, so it deserves
+the same care as the database.
+
+None of these are tools the model can call. Listing, reading, deleting and exporting
+memories happen only when you type the command yourself.
 
 ## API endpoints
 

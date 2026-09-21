@@ -38,6 +38,10 @@ class Settings(BaseSettings):
 
     database_path: Path = Path("data/lumos.db")
     notes_path: Path = Path("notes")
+    # Where `/memory export` writes. Under data/ by default, which is gitignored,
+    # because an export is every private fact you have saved in one plaintext file.
+    # The folder is created when an export is actually made, not at startup.
+    memory_export_path: Path = Path("data/exports")
     ingest_notes_on_startup: bool = True
     notes_max_file_bytes: int = 2_000_000
     chunk_size_chars: int = 1_200
@@ -115,6 +119,10 @@ class Settings(BaseSettings):
     @property
     def resolved_notes_path(self) -> Path:
         return _anchored(self.notes_path)
+
+    @property
+    def resolved_memory_export_path(self) -> Path:
+        return _anchored(self.memory_export_path)
 
     @property
     def resolved_ollama_base_url(self) -> str:
